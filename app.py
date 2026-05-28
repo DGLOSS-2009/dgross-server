@@ -24,6 +24,7 @@ import requests
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from openpyxl import load_workbook
+from supabase import create_client, Client
 
 app = Flask(__name__)
 CORS(app)
@@ -35,6 +36,17 @@ SITE_LABEL  = {'新宿SC': '新宿SC', '在宅G': 'リモートSC', 'AI': 'AI'}
 B_TO_D      = {'B0000106': 'D0000295', 'B0000107': 'D0000326'}
 KONO        = '幸野有希子CRM'   # 全体/サイト集計から除外
 EXCLUDE_OPS = ['堀川璃歩']      # 全集計から除外
+
+# Supabaseクライアント
+SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
+SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')
+_supabase_client = None
+
+def get_supabase() -> Client:
+    global _supabase_client
+    if not _supabase_client and SUPABASE_URL and SUPABASE_KEY:
+        _supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    return _supabase_client
 
 # GitHubからスタッフマスターを自動読み込み
 MASTER_URL = 'https://raw.githubusercontent.com/minakawa-star/digross-server/main/%E3%82%B9%E3%82%BF%E3%83%83%E3%83%95%E3%83%9E%E3%82%B9%E3%82%BF%E3%83%BC.xlsx'
@@ -60,6 +72,79 @@ def get_master_from_github():
 def health():
     return jsonify({'status': 'ok', 'message': 'PT事業部ダッシュボードサーバー稼働中'})
 
+
+# ============================================================
+# スタッフ管理エンドポイント
+# ============================================================
+@app.route('/staff', methods=['GET'])
+def get_staff():
+    try:
+        sb = get_supabase()
+        if not sb:
+            return jsonify({'error': 'Supabase未設定'}), 500
+        res = sb.table('staff').select('*').order('site').order('rank').order('name').execute()
+        return jsonify({'status': 'ok', 'data': res.data})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/staff', methods=['POST'])
+def add_staff():
+    try:
+        sb = get_supabase()
+        if not sb:
+            return jsonify({'error': 'Supabase未設定'}), 500
+        body = request.get_json()
+        res = sb.table('staff').insert(body).execute()
+        return jsonify({'status': 'ok', 'data': res.data})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/staff/<int:staff_id>', methods=['PUT'])
+def update_staff(staff_id):
+    try:
+        sb = get_supabase()
+        if not sb:
+            return jsonify({'error': 'Supabase未設定'}), 500
+        body = request.get_json()
+        res = sb.table('staff').update(body).eq('id', staff_id).execute()
+        return jsonify({'status': 'ok', 'data': res.data})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/staff/<int:staff_id>', methods=['DELETE'])
+def delete_staff(staff_id):
+    try:
+        sb = get_supabase()
+        if not sb:
+            return jsonify({'error': 'Supabase未設定'}), 500
+        res = sb.table('staff').delete().eq('id', staff_id).execute()
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# インセンティブ管理
+@app.route('/incentives/<month>', methods=['GET'])
+def get_incentives(month):
+    try:
+        sb = get_supabase()
+        if not sb:
+            return jsonify({'error': 'Supabase未設定'}), 500
+        res = sb.table('incentives').select('*').eq('month', month).execute()
+        return jsonify({'status': 'ok', 'data': res.data})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/incentives', methods=['POST'])
+def upsert_incentive():
+    try:
+        sb = get_supabase()
+        if not sb:
+            return jsonify({'error': 'Supabase未設定'}), 500
+        body = request.get_json()
+        res = sb.table('incentives').upsert(body, on_conflict='employee_id,month').execute()
+        return jsonify({'status': 'ok', 'data': res.data})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # ============================================================
 # メイン更新エンドポイント
