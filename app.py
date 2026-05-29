@@ -233,18 +233,28 @@ def update():
         calls_by_date = {}
         ops_by_date   = {}
 
-        # 生産性レポートの日付列を正規化（yyyy/mm/dd or yyyy-mm-dd → yyyy/mm/dd）
+        # 生産性レポートの日付列を正規化
+        # 例：「2026/5/1」→「2026/05/01」、「2026-05-01」→「2026/05/01」
+        def normalize_date(s):
+            s = str(s).replace('-', '/').strip()
+            parts = s.split('/')
+            if len(parts) == 3:
+                return f"{parts[0]}/{parts[1].zfill(2)}/{parts[2].zfill(2)}"
+            return s
+
         if '日付' in df_prod.columns:
-            df_prod['日付_norm'] = (df_prod['日付'].astype(str)
-                                    .str.replace('-', '/')
-                                    .str.strip())
+            df_prod['日付_norm'] = df_prod['日付'].apply(normalize_date)
         else:
             df_prod['日付_norm'] = ''
+
+        # エージェント列名を特定
+        agent_col = next((c for c in ['エージェント', 'エージェント名', 'Agent']
+                          if c in df_prod.columns), None)
 
         for d in biz_dates:
             mask = df_prod['日付_norm'] == d
             calls_by_date[d] = int(df_prod[mask]['コール数'].sum()) if mask.any() else 0
-            ops_by_date[d]   = int(len(df_prod[mask]))
+            ops_by_date[d]   = int(df_prod[mask][agent_col].nunique()) if (mask.any() and agent_col) else 0
 
         # ============================================================
         # 日次明細
@@ -603,12 +613,21 @@ def _calc_operators(df_apo, biz_dates, df_master, df_prod,
         cxl_d=('アポイントID', 'count'), sc_d=('sales', 'sum')).reset_index()
 
     # 生産性レポートのコール集計（日付正規化済み列を使用）
-    if '日付_norm' in df_prod.columns:
-        prod_month = df_prod[df_prod['日付_norm'].str.startswith(
-            biz_dates[0][:7] if biz_dates else '')]
+    if '日付_norm' in df_prod.columns and biz_dates:
+        month_prefix = biz_dates[0][:7]  # 例：2026/05
+        prod_month = df_prod[df_prod['日付_norm'].str.startswith(month_prefix)]
     else:
         prod_month = df_prod
-    calls_total = prod_month.groupby('エージェント')['コール数'].sum().to_dict()
+    # コール集計（エージェント列名を柔軟に対応）
+    agent_col = None
+    for col in ['エージェント', 'エージェント名', 'Agent']:
+        if col in prod_month.columns:
+            agent_col = col
+            break
+    if agent_col:
+        calls_total = prod_month.groupby(agent_col)['コール数'].sum().to_dict()
+    else:
+        calls_total = {}
 
     all_names = set(list(df_master['スタッフ名']) + list(op_get['スタッフ名']))
     operators = []
