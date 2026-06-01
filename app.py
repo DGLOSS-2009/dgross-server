@@ -165,7 +165,7 @@ def update():
         apo_file  = request.files['apo'].read()
         prod_file = request.files['prod'].read()
         work_raw  = request.files['work'].read()
-        work_file = _extract_work_from_zip(work_raw)
+        work_file, work_end_date = _extract_work_from_zip(work_raw)
         prev_json = json.loads(request.files['prev'].read().decode('utf-8'))
 
         # スタッフマスター：アップロード優先、なければGitHubから取得
@@ -218,6 +218,24 @@ def update():
             return jsonify({'error': '当月のアポイントデータが見つかりません'}), 400
 
         elapsed = len(biz_dates)
+
+        # ============================================================
+        # jinjer勤務データの期間検証
+        # ファイル名の終了日とアポリストの最終営業日を比較
+        # 差が2営業日以上あれば警告をmetaに記録
+        # ============================================================
+        work_period_warning = None
+        if work_end_date:
+            last_biz = biz_dates[-1]  # 例：2026/05/28
+            # 終了日を yyyy/mm/dd に正規化
+            work_end_norm = '/'.join(p.zfill(2) for p in work_end_date.split('/'))
+            if work_end_norm < last_biz:
+                work_period_warning = (
+                    f'jinjer勤務データの終了日（{work_end_date}）が'
+                    f'アポリストの最終営業日（{last_biz}）より前です。'
+                    f'月給制スタッフの人件費が過小計上になる可能性があります。'
+                    f'jinjerは当月1日〜最終更新日の期間で出力してください。'
+                )
 
         # ============================================================
         # 人件費計算（勤務データから）
@@ -383,6 +401,7 @@ def update():
                 'alertText':       f"{last_date}のデータを反映済みです（累計{elapsed}営業日）。最終更新: {today}",
                 'enrollCount':     enroll_count,   # 【追加】在籍数
                 'activeCount':     active_count,   # 【追加】稼働数
+                'workPeriodWarning': work_period_warning,  # jinjer期間ズレ警告
             },
             'targets':   targets,
             'sites':     sites,
@@ -409,15 +428,31 @@ def update():
 # ヘルパー関数
 # ============================================================
 def _extract_work_from_zip(file_bytes):
+    """
+    zip圧縮の勤務データを展開してcsvバイトを返す。
+    【追加】ファイル名から期間（終了日）を抽出して返す。
+    戻り値: (csv_bytes, end_date_str or None)
+    """
     try:
         with zipfile.ZipFile(io.BytesIO(file_bytes)) as zf:
             csv_files = [n for n in zf.namelist() if n.lower().endswith('.csv')]
             if not csv_files:
                 raise ValueError('zip内にcsvファイルが見つかりません')
             target = max(csv_files, key=lambda n: zf.getinfo(n).file_size)
-            return zf.read(target)
+            # ファイル名から終了日を抽出
+            # 例：勤務データ_打刻グループ_2026_05_01_2026_05_28.csv
+            import re
+            try:
+                fname = target.encode('cp437').decode('cp932')
+            except:
+                fname = target
+            end_date = None
+            m = re.search(r'\d{4}_\d{2}_\d{2}_(\d{4}_\d{2}_\d{2})', fname)
+            if m:
+                end_date = m.group(1).replace('_', '/')
+            return zf.read(target), end_date
     except zipfile.BadZipFile:
-        return file_bytes
+        return file_bytes, None
 
 
 def _load_master(file_bytes):
