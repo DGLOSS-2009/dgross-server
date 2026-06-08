@@ -219,6 +219,9 @@ def update():
 
         elapsed = len(biz_dates)
 
+        # 6月以降は幸野有希子CRMを通常スタッフとして全集計に含める
+        kono_excluded = target_month < 6  # True=除外（5月まで）, False=含める（6月以降）
+
         # ============================================================
         # jinjer勤務データの期間検証
         # ファイル名の終了日とアポリストの最終営業日を比較
@@ -280,7 +283,7 @@ def update():
         daily = {'all': [], 'shinjuku': [], 'remote': [], 'ai': []}
         for i, date_str in enumerate(biz_dates, 1):
             d = _calc_daily(df_apo, date_str, site_map,
-                            calls_by_date, ops_by_date, i)
+                            calls_by_date, ops_by_date, i, kono_excluded)
             for key in ['all', 'shinjuku', 'remote', 'ai']:
                 daily[key].append(d[key])
 
@@ -322,7 +325,7 @@ def update():
             all_ops = [op for op in _calc_operators(
                 df_apo, biz_dates, df_master, df_prod,
                 work_by_id, labor_by_id, days_by_id, id_map, site_map, rank_map,
-                inc_map, elapsed, working)
+                inc_map, elapsed, working, kono_excluded)
                 if (k == 'all' or op['site'] == site_jp)
                 and op['sales'] > 0 and op.get('days', 0) > 0]
             ts = sum(o['sales'] for o in all_ops)
@@ -349,7 +352,7 @@ def update():
         # ============================================================
         # ヒートマップ
         # ============================================================
-        heatmap = _calc_heatmap(df_apo, biz_dates, sites['all']['sales'])
+        heatmap = _calc_heatmap(df_apo, biz_dates, sites['all']['sales'], kono_excluded)
 
         # ============================================================
         # OP個人実績
@@ -357,7 +360,7 @@ def update():
         operators = _calc_operators(
             df_apo, biz_dates, df_master, df_prod,
             work_by_id, labor_by_id, days_by_id, id_map, site_map, rank_map,
-            inc_map, elapsed, working)
+            inc_map, elapsed, working, kono_excluded)
 
         # ============================================================
         # 【修正】enrollCount・activeCount を計算
@@ -573,26 +576,40 @@ def _calc_labor(df_work, df_master, df_wage, master_ids, working):
     return site_labor, work_by_id, labor_by_id, days_by_id  # 【修正】days_by_idを追加
 
 
-def _calc_daily(df_apo, date_str, site_map, calls_by_date, ops_by_date, day_num):
+def _calc_daily(df_apo, date_str, site_map, calls_by_date, ops_by_date, day_num, kono_excluded=True):
     """1営業日分の集計"""
+    kono_filter = (df_apo['スタッフ名'] != KONO) if kono_excluded else pd.Series([True]*len(df_apo), index=df_apo.index)
     df_g = df_apo[
         (df_apo['取得日'] == date_str) &
-        (df_apo['スタッフ名'] != KONO)
+        kono_filter
     ].copy()
     df_g['site_raw'] = df_g['スタッフ名'].map(site_map)
 
     df_c = df_apo[
         (df_apo['cancel_date_str'] == date_str) &
-        (df_apo['スタッフ名'] != KONO)
+        kono_filter
     ].copy()
     df_c['site_raw'] = df_c['スタッフ名'].map(site_map)
+
+    # 当日の案件別集計（全体・TOP5）
+    pg = df_g.groupby('登録案件名').agg(apo=('アポイントID','count'), sg=('sales','sum')).reset_index()
+    pc = df_c.groupby('登録案件名').agg(cxl=('アポイントID','count'), sc=('sales','sum')).reset_index()
+    proj = pg.merge(pc, on='登録案件名', how='left').fillna(0)
+    proj['valid'] = (proj['apo'] - proj['cxl']).astype(int)
+    proj['net']   = (proj['sg']  - proj['sc']).astype(int)
+    proj = proj[proj['valid'] > 0].sort_values('valid', ascending=False).head(5)
+    top_projects = [
+        {'name': str(r['登録案件名']), 'valid': int(r['valid']), 'sales': int(r['net'])}
+        for _, r in proj.iterrows()
+    ]
+    max_valid = top_projects[0]['valid'] if top_projects else 1
 
     result = {}
     for key, raw in [('all', None), ('shinjuku', '新宿SC'),
                      ('remote', '在宅G'), ('ai', 'AI')]:
         g = df_g if raw is None else df_g[df_g['site_raw'] == raw]
         c = df_c if raw is None else df_c[df_c['site_raw'] == raw]
-        result[key] = {
+        row = {
             'day':    f'{day_num}営業日',
             'date':   date_str,
             'sales':  int(g['sales'].sum()) - int(c['sales'].sum()),
@@ -602,17 +619,23 @@ def _calc_daily(df_apo, date_str, site_map, calls_by_date, ops_by_date, day_num)
             'ops':    ops_by_date.get(date_str, 0),
             'calls':  calls_by_date.get(date_str, 0) if key == 'all' else 0,
         }
+        # 案件内訳はallのみ付与
+        if key == 'all':
+            row['top_projects'] = top_projects
+            row['max_valid']    = max_valid
+        result[key] = row
     return result
 
 
-def _calc_heatmap(df_apo, biz_dates, total_sales):
+def _calc_heatmap(df_apo, biz_dates, total_sales, kono_excluded=True):
+    kono_filter = (df_apo['スタッフ名'] != KONO) if kono_excluded else pd.Series([True]*len(df_apo), index=df_apo.index)
     df_g = df_apo[
         df_apo['取得日'].isin(biz_dates) &
-        (df_apo['スタッフ名'] != KONO)
+        kono_filter
     ].copy()
     df_c = df_apo[
         df_apo['cancel_date_str'].isin(biz_dates) &
-        (df_apo['スタッフ名'] != KONO)
+        kono_filter
     ].copy()
     pg = df_g.groupby('登録案件名').agg(
         apo=('アポイントID', 'count'), sg=('sales', 'sum')).reset_index()
@@ -632,13 +655,12 @@ def _calc_heatmap(df_apo, biz_dates, total_sales):
 
 def _calc_operators(df_apo, biz_dates, df_master, df_prod,
                     work_by_id, labor_by_id, days_by_id, id_map,
-                    site_map, rank_map, inc_map, elapsed, working):
-    """
-    OP個人実績
-    【修正】days_by_id を受け取り、hours÷8の推定をやめて実際の出勤日数を使用
-    """
+                    site_map, rank_map, inc_map, elapsed, working, kono_excluded=True):
+    """OP個人実績"""
+    kono_filter_get = (df_apo['スタッフ名'] != KONO) if kono_excluded else pd.Series([True]*len(df_apo), index=df_apo.index)
     df_get = df_apo[
-        df_apo['取得日'].isin(biz_dates)
+        df_apo['取得日'].isin(biz_dates) &
+        kono_filter_get
     ].copy()
 
     kouryo = (
@@ -712,6 +734,20 @@ def _calc_operators(df_apo, biz_dates, df_master, df_prod,
         rank_d = rank_map.get(name, '')
         unit_pd= round(net_op / days) if days > 0 and net_op > 0 else 0
 
+        # 案件別内訳（有効アポ数TOP10）
+        g_proj  = df_get[df_get['スタッフ名'] == name].groupby('登録案件名').agg(
+            apo=('アポイントID','count'), sales=('sales','sum')).reset_index()
+        c_proj  = df_cxl_dash[df_cxl_dash['スタッフ名'] == name].groupby('登録案件名').agg(
+            cxl=('アポイントID','count'), sc=('sales','sum')).reset_index()
+        proj_m  = g_proj.merge(c_proj, on='登録案件名', how='left').fillna(0)
+        proj_m['valid'] = (proj_m['apo'] - proj_m['cxl']).astype(int)
+        proj_m['net']   = (proj_m['sales'] - proj_m['sc']).astype(int)
+        proj_m = proj_m[proj_m['valid'] > 0].sort_values('valid', ascending=False).head(10)
+        projects = [
+            {'name': str(r['登録案件名']), 'valid': int(r['valid']), 'sales': int(r['net'])}
+            for _, r in proj_m.iterrows()
+        ]
+
         operators.append({
             'name': name, 'site': site_d, 'rank': rank_d,
             'sales': net_op, 'sales_dash': net_dash,
@@ -721,6 +757,7 @@ def _calc_operators(df_apo, biz_dates, df_master, df_prod,
             'labor': labor,
             'labor_base': l_base, 'incentive_daily': inc_day,
             'days': days, 'unitPerDay': unit_pd, 'costRate': cost_r,
+            'projects': projects,
         })
 
     operators.sort(key=lambda x: (-x['sales'] if x['sales'] > 0
