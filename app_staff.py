@@ -14,13 +14,6 @@ JWT_SECRET = os.environ.get("JWT_SECRET")
 supabase_staff = create_client(SUPABASE_STAFF_URL, SUPABASE_STAFF_KEY)
 
 def register_staff_routes(app):
-    CORS(app, resources={
-        r"/staff/*": {"origins": [
-            "https://minakawa-star.github.io",
-            "http://localhost:3000"
-        ]},
-        r"/health_staff": {"origins": "*"}
-    })
 
     @app.route("/health_staff")
     def health_staff():
