@@ -1,8 +1,6 @@
 import os
-import io
 import jwt
 import datetime
-import pandas as pd
 from flask import jsonify, request
 from supabase import create_client
 
@@ -27,7 +25,7 @@ def register_staff_routes(app):
                 return jsonify({"error": "データがありません"}), 400
             for r in records:
                 r["target_month"] = r["acquired_date"][:7] + "-01" if r.get("acquired_date") else None
-            supabase_staff.table("appointments").upsert(records, on_conflict="staff_id,acquired_date,amount").execute()
+            supabase_staff.table("appointments").upsert(records, on_conflict="appointment_id").execute()
             return jsonify({"status": "ok", "count": len(records)})
         except Exception as e:
             import traceback
@@ -44,21 +42,4 @@ def register_staff_routes(app):
                 r["target_month"] = r["call_date"][:7] + "-01" if r.get("call_date") else None
             supabase_staff.table("productivity").upsert(records, on_conflict="staff_id,call_date").execute()
             return jsonify({"status": "ok", "count": len(records)})
-        except Exception as e:
-            import traceback
-            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
-
-    @app.route("/staff/upload/attendance_json", methods=["POST"])
-    def upload_attendance_json():
-        try:
-            data = request.get_json()
-            records = data.get("records", [])
-            if not records:
-                return jsonify({"error": "データがありません"}), 400
-            for r in records:
-                r["target_month"] = r["work_date"][:7] + "-01" if r.get("work_date") else None
-            supabase_staff.table("attendance").upsert(records, on_conflict="staff_id,work_date").execute()
-            return jsonify({"status": "ok", "count": len(records)})
-        except Exception as e:
-            import traceback
-            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+        except Exce
