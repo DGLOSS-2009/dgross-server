@@ -231,6 +231,14 @@ def update():
 
         elapsed = len(biz_dates)
 
+        # 前回のelapsedDaysより少ない場合は警告（アポリストが古い可能性）
+        prev_elapsed = prev_json.get('meta', {}).get('elapsedDays', 0)
+        if elapsed < prev_elapsed:
+            return jsonify({
+                'error': f'アポリストのデータが前回より少なくなっています（前回:{prev_elapsed}営業日 → 今回:{elapsed}営業日）。'
+                         f'最新のアポリスト（当月含む過去3ヶ月分）をアップしてください。'
+            }), 400
+
         # 6月以降は新宿SC→六本木SCに表示変更
         kono_excluded = target_month < 6
         site_label = SITE_LABEL_JUNE if target_month >= 6 else SITE_LABEL
