@@ -588,17 +588,23 @@ def _extract_work_from_zip(file_bytes):
 def _load_master(file_bytes):
     wb = load_workbook(io.BytesIO(file_bytes), read_only=True)
     ws_m = wb['スタッフマスター']
-    df_m = pd.DataFrame(
-        list(ws_m.iter_rows(values_only=True))[1:],
-        columns=['社員番号', 'スタッフ名', 'サイト', 'ランク']
-    ).dropna(subset=['社員番号']).fillna('')
+    rows_m = list(ws_m.iter_rows(values_only=True))[1:]
+    df_m = pd.DataFrame(rows_m, columns=['社員番号', 'スタッフ名', 'サイト', 'ランク'])
+    df_m = df_m.dropna(subset=['社員番号']).fillna('')
     df_m['社員番号'] = df_m['社員番号'].astype(str).str.strip()
 
     ws_w = wb['時給マスター']
-    df_w = pd.DataFrame(
-        list(ws_w.iter_rows(values_only=True))[1:],
-        columns=['社員番号', 'スタッフ名', '時給', '備考']
-    ).dropna(subset=['社員番号']).fillna('')
+    rows_w = list(ws_w.iter_rows(values_only=True))[1:]
+    # 列数に応じて柔軟に対応（4列または5列）
+    header_w = list(wb['時給マスター'].iter_rows(values_only=True))[0]
+    col_count = sum(1 for c in header_w if c is not None)
+    if col_count >= 4:
+        # 先頭4列のみ使用（末尾の空列は無視）
+        rows_w_trimmed = [r[:4] for r in rows_w]
+        df_w = pd.DataFrame(rows_w_trimmed, columns=['社員番号', 'スタッフ名', '時給', '備考'])
+    else:
+        df_w = pd.DataFrame(rows_w, columns=['社員番号', 'スタッフ名', '時給', '備考'])
+    df_w = df_w.dropna(subset=['社員番号']).fillna('')
     df_w['社員番号'] = df_w['社員番号'].astype(str).str.strip()
     df_w['時給'] = pd.to_numeric(df_w['時給'], errors='coerce').fillna(0).astype(int)
     return df_m, df_w
@@ -990,5 +996,3 @@ def _calc_operators(df_apo, biz_dates, df_master, df_prod,
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
-from app_staff import register_staff_routes
-register_staff_routes(app)
