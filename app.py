@@ -333,7 +333,6 @@ def update():
         for k in ['all', 'shinjuku', 'remote', 'ai']:
             site_jp = {'all': None, 'shinjuku': shinjuku_label,
                        'remote': 'リモートSC', 'ai': 'AI'}[k]
-            calls  = sum(op.get('calls', 0) or 0 for op in site_ops) if k != 'all' else sum(r['calls'] for r in daily['all'])
             last   = daily[k][-1] if daily[k] else {}
             jinjer = {
                 'all':      sum(site_labor.values()),
@@ -343,21 +342,19 @@ def update():
             }[k]
             labor = jinjer + (inc_all if k == 'all' else inc_site.get(site_jp, 0))
 
-            # ============================================================
-            # 【変更】sales/apo/cancel/valid はOP個人実績の積み上げで統一
-            # 全体 = 各サイトの合計 が成立する
-            # ============================================================
+            # OP個人実績の積み上げ（全体 = 各サイトの合計が成立）
             site_ops = [op for op in _ops_for_unit
                         if k == 'all' or op['site'] == site_jp]
             sales  = sum(op['sales']  for op in site_ops)
             apo    = sum(op['apo']    for op in site_ops)
             cancel = sum(op['cancel'] for op in site_ops)
             valid  = apo - cancel
+            # callsはsite_ops定義後に計算（前ループの値を使わないよう順序を保証）
+            calls  = sum(op.get('calls', 0) or 0 for op in site_ops) if k != 'all' else sum(r['calls'] for r in daily['all'])
             cr     = round(cancel / apo * 100, 1) if apo > 0 else 0
             ar     = round(apo / calls * 100, 2)  if calls > 0 else 0
             cost   = round(labor / sales * 100, 1) if sales > 0 else 0
 
-            # 稼働単価（有効売上ベース）
             ts = sum(o['sales'] for o in site_ops if o['sales'] > 0 and o.get('days', 0) > 0)
             td = sum(o['days']  for o in site_ops if o['sales'] > 0 and o.get('days', 0) > 0)
             unit = round(ts / td) if td > 0 else 0
