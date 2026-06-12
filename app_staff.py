@@ -1,6 +1,7 @@
 import os
 import jwt
 import datetime
+import calendar
 import bcrypt
 from flask import jsonify, request
 from supabase import create_client
@@ -42,6 +43,16 @@ RATE_TABLE = {
         7: (2.95, 2.57), 6: (2.95, 2.57), 5: (2.95, 2.57)},
 }
 
+# インセンティブ用：休み日数→比重テーブル
+INCENTIVE_RATE_TABLE = [
+    (1, 2.30),   # 休み0-1日 → 週5
+    (4, 2.45),   # 休み2-4日 → 週4
+    (8, 2.60),   # 休み5-8日 → 週3
+    (12, 2.75),  # 休み9-12日 → 週2
+]
+INCENTIVE_SOCIAL_INSURANCE = 3150
+
+
 def load_staff_master():
     wb = load_workbook(MASTER_PATH, data_only=True)
     ws1 = wb["スタッフマスター"]
@@ -77,6 +88,7 @@ def load_staff_master():
 
     return master
 
+
 def jwt_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -93,6 +105,7 @@ def jwt_required(f):
             return jsonify({"error": "無効なトークンです"}), 401
         return f(*args, **kwargs)
     return decorated
+
 
 def admin_required(f):
     @wraps(f)
@@ -168,6 +181,27 @@ def calc_campaign_fb(apo_rows, campaigns):
                 totals[sid] = totals.get(sid, 0) + amt
 
     return breakdown, totals
+
+
+def shift_month(target_month_str, delta):
+    """target_month('YYYY-MM-01')をdeltaヶ月シフトした 'YYYY-MM-01' を返す"""
+    y, m, _ = map(int, target_month_str.split("-"))
+    total = (y * 12 + (m - 1)) + delta
+    ny = total // 12
+    nm = total % 12 + 1
+    return f"{ny:04d}-{nm:02d}-01"
+
+
+def get_business_days(year, month, holidays_set):
+    """その月の平日数(土日・祝日を除く)を計算"""
+    days_in_month = calendar.monthrange(year, month)[1]
+    count = 0
+    for day in range(1, days_in_month + 1):
+        d = datetime.date(year, month, day)
+        if d.weekday() < 5:  # Mon-Fri
+            if d.isoformat() not in holidays_set:
+                count += 1
+    return count
 
 
 def register_staff_routes(app):
@@ -424,6 +458,74 @@ def register_staff_routes(app):
                 import traceback
                 return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
+    # ============================================================
+    # インセンティブ設定（対象時給範囲）
+    # ============================================================
+    @app.route("/staff/incentive_settings", methods=["GET", "POST"])
+    @admin_required
+    def incentive_settings():
+        if request.method == "GET":
+            try:
+                res = supabase_staff.table("incentive_settings").select("*").eq("id", 1).execute()
+                if res.data:
+                    return jsonify({"status": "ok", "data": res.data[0]})
+                else:
+                    return jsonify({"status": "ok", "data": {"id": 1, "min_wage": 2100, "max_wage": 2500}})
+            except Exception as e:
+                import traceback
+                return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+        else:
+            try:
+                data = request.get_json()
+                min_wage = int(data.get("min_wage"))
+                max_wage = int(data.get("max_wage"))
+                if min_wage > max_wage:
+                    return jsonify({"error": "下限は上限以下にしてください"}), 400
+                supabase_staff.table("incentive_settings").upsert({
+                    "id": 1, "min_wage": min_wage, "max_wage": max_wage
+                }).execute()
+                return jsonify({"status": "ok"})
+            except Exception as e:
+                import traceback
+                return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    # ============================================================
+    # インセンティブ用給与データ（管理本部CSV）アップロード
+    # ============================================================
+    @app.route("/staff/upload/incentive_payroll_json", methods=["POST"])
+    @admin_required
+    def upload_incentive_payroll_json():
+        try:
+            data = request.get_json()
+            month = data.get("month")  # "YYYY-MM"
+            records = data.get("records", [])
+            if not month or not records:
+                return jsonify({"error": "month, recordsが必要です"}), 400
+
+            target_month = month + "-01"
+            rows = []
+            for r in records:
+                sid = str(r.get("staff_id", "")).strip()
+                if not sid:
+                    continue
+                sid = B_TO_D.get(sid, sid)
+                rows.append({
+                    "staff_id": sid,
+                    "target_month": target_month,
+                    "base_salary": r.get("base_salary") or 0,
+                    "commute_allowance": r.get("commute_allowance") or 0
+                })
+
+            if rows:
+                supabase_staff.table("incentive_payroll").upsert(rows, on_conflict="staff_id,target_month").execute()
+            return jsonify({"status": "ok", "count": len(rows)})
+        except Exception as e:
+            import traceback
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    # ============================================================
+    # メイン集計
+    # ============================================================
     @app.route("/staff/summary")
     def staff_summary():
         try:
@@ -449,6 +551,38 @@ def register_staff_routes(app):
             campaigns_res = supabase_staff.table("fb_campaigns").select("*").execute()
             campaign_breakdown, campaign_totals = calc_campaign_fb(apo_rows, campaigns_res.data)
 
+            # ---- インセンティブ計算用の事前データ ----
+            settings_res = supabase_staff.table("incentive_settings").select("*").eq("id", 1).execute()
+            if settings_res.data:
+                inc_min = settings_res.data[0]["min_wage"]
+                inc_max = settings_res.data[0]["max_wage"]
+            else:
+                inc_min, inc_max = 2100, 2500
+
+            prior_month = shift_month(target_month, -2)  # 2ヶ月前
+
+            prior_att_res = supabase_staff.table("attendance")\
+                .select("*").eq("target_month", prior_month).execute()
+            prior_work_days_map = {}
+            for row in prior_att_res.data:
+                sid = B_TO_D.get(row["staff_id"], row["staff_id"])
+                if (row.get("work_hours") or 0) > 0:
+                    prior_work_days_map[sid] = prior_work_days_map.get(sid, 0) + 1
+
+            prior_payroll_res = supabase_staff.table("incentive_payroll")\
+                .select("*").eq("target_month", prior_month).execute()
+            prior_payroll_map = {}
+            for row in prior_payroll_res.data:
+                sid = B_TO_D.get(row["staff_id"], row["staff_id"])
+                prior_payroll_map[sid] = row.get("commute_allowance") or 0
+
+            holidays_res = supabase_staff.table("holidays").select("holiday_date").execute()
+            holidays_set = {h["holiday_date"] for h in holidays_res.data}
+
+            py, pm, _ = map(int, prior_month.split("-"))
+            prior_business_days = get_business_days(py, pm, holidays_set)
+
+            # ---- 結果初期化 ----
             results = {}
             for sid, info in master.items():
                 results[sid] = {
@@ -470,7 +604,10 @@ def register_staff_routes(app):
                     "hourly_wage": info["hourly_wage"],
                     "monthly_salary": info["monthly_salary"],
                     "planned_work_days": 0,
-                    "is_confirmed": False
+                    "is_confirmed": False,
+                    "incentive_target": None,
+                    "incentive_status": "対象外",
+                    "incentive_detail": None
                 }
 
             for row in apo_rows:
@@ -522,6 +659,7 @@ def register_staff_routes(app):
                 else:
                     calc_days = tgt["planned_work_days"] if (tgt and tgt["planned_work_days"] > 0) else r["work_days"]
 
+                # ---- 通常の達成/維持目標 ----
                 if info["monthly_salary"] is not None:
                     base = info["monthly_salary"] * 1.15 + 20000
                     r["target_achieve"] = int(base / 0.40)
@@ -541,6 +679,42 @@ def register_staff_routes(app):
 
                 if r["target_achieve"] > 0:
                     r["achieve_rate"] = round(r["sales"] / r["target_achieve"] * 100, 1)
+
+                # ---- インセンティブ目標 ----
+                if info["monthly_salary"] is not None:
+                    r["incentive_status"] = "対象外（月給制）"
+                else:
+                    wage = info["hourly_wage"]
+                    if wage < inc_min or wage > inc_max:
+                        r["incentive_status"] = "対象外"
+                    else:
+                        prior_work_days = prior_work_days_map.get(sid, 0)
+                        rest_days = prior_business_days - prior_work_days
+
+                        rate = None
+                        for max_rest, rate_val in INCENTIVE_RATE_TABLE:
+                            if rest_days <= max_rest:
+                                rate = rate_val
+                                break
+
+                        if rate is None:
+                            r["incentive_status"] = "対象外（出勤実績不足）"
+                        else:
+                            commute = prior_payroll_map.get(sid, 0)
+                            daily_target = (wage * 8 + INCENTIVE_SOCIAL_INSURANCE + commute) * rate
+                            incentive_target = int(daily_target * prior_work_days)
+
+                            r["incentive_target"] = incentive_target
+                            r["incentive_status"] = "ok"
+                            r["incentive_detail"] = {
+                                "prior_month": prior_month[:7],
+                                "prior_work_days": prior_work_days,
+                                "prior_business_days": prior_business_days,
+                                "rest_days": rest_days,
+                                "rate": rate,
+                                "commute_allowance": commute,
+                                "daily_target": int(daily_target)
+                            }
 
             return jsonify({"status": "ok", "data": list(results.values())})
 
