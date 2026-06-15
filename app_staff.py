@@ -562,7 +562,8 @@ def register_staff_routes(app):
             targets_map = {t["staff_id"]: t for t in targets_res.data}
 
             campaigns_res = supabase_staff.table("fb_campaigns").select("*").execute()
-            campaign_breakdown, campaign_totals = calc_campaign_fb(apo_rows, campaigns_res.data)
+            bulk_res = supabase_staff.table("fb_bulk_amounts").select("*").execute()
+            campaign_breakdown, campaign_totals = calc_campaign_fb(apo_rows, campaigns_res.data, bulk_res.data)
 
             # ---- インセンティブ計算用の事前データ ----
             settings_res = supabase_staff.table("incentive_settings").select("*").eq("id", 1).execute()
