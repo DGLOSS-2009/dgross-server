@@ -778,17 +778,53 @@ def register_staff_routes(app):
             import traceback
             return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
-    @app.route("/staff/upload/attendance_json", methods=["POST"])
-    def upload_attendance_json():
+    @app.route("/staff/upload/fb_bulk_json", methods=["POST"])
+    @admin_required
+    def upload_fb_bulk_json():
         try:
             data = request.get_json()
             records = data.get("records", [])
             if not records:
                 return jsonify({"error": "データがありません"}), 400
+
+            # campaign_nameからcampaign_idを解決
+            campaigns_res = supabase_staff.table("fb_campaigns").select("id,name").execute()
+            name_to_id = {c["name"]: c["id"] for c in campaigns_res.data}
+
+            rows = []
+            errors = []
             for r in records:
-                r["target_month"] = r["work_date"][:7] + "-01" if r.get("work_date") else None
-            supabase_staff.table("attendance").upsert(records, on_conflict="staff_id,work_date").execute()
-            return jsonify({"status": "ok", "count": len(records)})
+                sid = str(r.get("staff_id", "")).strip()
+                campaign_name = str(r.get("campaign_name", "")).strip()
+                amount = r.get("amount", 0)
+
+                if not sid or not campaign_name:
+                    continue
+
+                campaign_id = name_to_id.get(campaign_name)
+                if not campaign_id:
+                    errors.append(f"キャンペーン名が見つかりません: {campaign_name}")
+                    continue
+
+                sid = B_TO_D.get(sid, sid)
+                rows.append({
+                    "campaign_id": campaign_id,
+                    "staff_id": sid,
+                    "amount": int(str(amount).replace(",", "")) if amount else 0
+                })
+
+            if rows:
+                # 既存データを削除してから再挿入（同一キャンペーンの上書き）
+                campaign_ids = list(set(r["campaign_id"] for r in rows))
+                for cid in campaign_ids:
+                    supabase_staff.table("fb_bulk_amounts").delete().eq("campaign_id", cid).execute()
+                supabase_staff.table("fb_bulk_amounts").insert(rows).execute()
+
+            return jsonify({
+                "status": "ok",
+                "count": len(rows),
+                "errors": errors
+            })
         except Exception as e:
             import traceback
             return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
