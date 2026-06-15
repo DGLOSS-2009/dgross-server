@@ -124,7 +124,7 @@ def admin_required(f):
     return decorated
 
 
-def calc_campaign_fb(apo_rows, campaigns):
+def calc_campaign_fb(apo_rows, campaigns, bulk_amounts=None):
     """
     FBキャンペーンの集計。
     戻り値:
@@ -133,6 +133,10 @@ def calc_campaign_fb(apo_rows, campaigns):
     """
     breakdown = {}
     totals = {}
+    bulk_map = {}
+    if bulk_amounts:
+        for b in bulk_amounts:
+            bulk_map.setdefault(b["campaign_id"], []).append(b)
 
     for c in campaigns:
         target_types = c.get("target_types") or []
@@ -143,7 +147,16 @@ def calc_campaign_fb(apo_rows, campaigns):
         calc_type = c.get("calc_type")
         amount = c.get("amount", 0)
 
-        if calc_type == "fixed":
+        if calc_type == "bulk":
+            for b in bulk_map.get(c["id"], []):
+                sid = B_TO_D.get(b["staff_id"], b["staff_id"])
+                breakdown.setdefault(sid, []).append({
+                    "name": c.get("name"),
+                    "category": c.get("category"),
+                    "amount": b["amount"]
+                })
+                totals[sid] = totals.get(sid, 0) + b["amount"]
+        elif calc_type == "fixed":
             for sid in target_staff_ids:
                 sid_m = B_TO_D.get(sid, sid)
                 breakdown.setdefault(sid_m, []).append({
