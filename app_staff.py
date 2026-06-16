@@ -123,7 +123,115 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
+def calc_auto_fb(master, apo_rows, att_rows, target_month, holidays_set, auto_settings):
+    """
+    FB自動集計（行動量ボーナス・勤怠ペナルティ）
+    戻り値:
+      breakdown: { staff_id: [ {name, category, amount}, ... ] }
+      totals:    { staff_id: 合計金額 }
+    """
+    breakdown = {}
+    totals = {}
 
+    if not auto_settings:
+        return breakdown, totals
+
+    threshold = auto_settings.get("behavior_bonus_threshold", 45000)
+    bonus_w5 = auto_settings.get("behavior_bonus_w5", 50000)
+    bonus_w4 = auto_settings.get("behavior_bonus_w4", 30000)
+    bonus_w3 = auto_settings.get("behavior_bonus_w3", 10000)
+    penalty_per = auto_settings.get("penalty_per_count", 20000)
+
+    # 営業日数を取得
+    y, m, _ = map(int, target_month.split("-"))
+    business_days = get_business_days(y, m, holidays_set)
+
+    # 出勤日数・売上・ペナルティを集計
+    work_days_map = {}
+    penalty_map = {}
+    sales_map = {}
+
+    for row in att_rows:
+        sid = B_TO_D.get(row["staff_id"], row["staff_id"])
+        if sid not in master:
+            continue
+
+        # 出勤日数
+        if (row.get("work_hours") or 0) > 0:
+            work_days_map[sid] = work_days_map.get(sid, 0) + 1
+
+        # 勤怠ペナルティ
+        absence = str(row.get("absence_status") or "").strip()
+        late = str(row.get("late") or "").strip()
+        early = str(row.get("early_leave") or "").strip()
+
+        count = 0
+        if absence == "1":
+            count += 1
+        if late == "0":
+            count += 1
+        if early == "0":
+            count += 1
+
+        if count > 0:
+            penalty_map[sid] = penalty_map.get(sid, 0) + count
+
+    # 売上集計
+    for row in apo_rows:
+        sid = B_TO_D.get(row["staff_id"], row["staff_id"])
+        if sid not in master:
+            continue
+        cancel = str(row.get("cancel_date") or "")
+        if not cancel or cancel == "None":
+            sales_map[sid] = sales_map.get(sid, 0) + row.get("amount", 0)
+
+    # 行動量ボーナス判定
+    for sid in master:
+        work_days = work_days_map.get(sid, 0)
+        sales = sales_map.get(sid, 0)
+        rest_days = business_days - work_days
+
+        # 週区分判定
+        if rest_days <= 1:
+            bonus = bonus_w5
+            week_label = "週5"
+        elif rest_days <= 4:
+            bonus = bonus_w4
+            week_label = "週4"
+        elif rest_days <= 8:
+            bonus = bonus_w3
+            week_label = "週3"
+        else:
+            continue  # 対象外
+
+        if work_days == 0:
+            continue
+
+        # 1日平均売上チェック
+        daily_avg = sales / work_days
+        if daily_avg < threshold:
+            continue
+
+        breakdown.setdefault(sid, []).append({
+            "name": f"行動量ボーナス（{week_label}）",
+            "category": "行動量ボーナス",
+            "amount": bonus
+        })
+        totals[sid] = totals.get(sid, 0) + bonus
+
+    # 勤怠ペナルティ
+    for sid, count in penalty_map.items():
+        if sid not in master:
+            continue
+        amount = count * (-penalty_per)
+        breakdown.setdefault(sid, []).append({
+            "name": f"勤怠ペナルティ（{count}回）",
+            "category": "勤怠ペナルティ",
+            "amount": amount
+        })
+        totals[sid] = totals.get(sid, 0) + amount
+
+    return breakdown, totals
 def calc_campaign_fb(apo_rows, campaigns, bulk_amounts=None):
     """
     FBキャンペーンの集計。
