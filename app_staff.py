@@ -358,7 +358,8 @@ def register_staff_routes(app):
                 "token": token,
                 "staff_id": staff["staff_id"],
                 "role": staff["role"],
-                "name": staff["staff_name"]
+                "name": staff["staff_name"],
+                "password_changed": staff.get("password_changed", False)
             })
         except Exception as e:
             import traceback
@@ -371,18 +372,18 @@ def register_staff_routes(app):
             data = request.get_json()
             staff_id = data.get("staff_id", "").strip()
             staff_name = data.get("staff_name", "").strip()
-            login_id = data.get("login_id", "").strip()
-            password = data.get("password", "").strip()
             role = data.get("role", "staff")
-            if not all([staff_id, staff_name, login_id, password]):
+            if not all([staff_id, staff_name]):
                 return jsonify({"error": "必須項目が不足しています"}), 400
-            password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+            default_password = "Dghojin2026"
+            password_hash = bcrypt.hashpw(default_password.encode(), bcrypt.gensalt()).decode()
             supabase_staff.table("staff_master").upsert({
                 "staff_id": staff_id,
                 "staff_name": staff_name,
-                "login_id": login_id,
+                "login_id": staff_id,
                 "password_hash": password_hash,
-                "role": role
+                "role": role,
+                "password_changed": False
             }).execute()
             return jsonify({"status": "ok", "staff_id": staff_id})
         except Exception as e:
@@ -401,6 +402,45 @@ def register_staff_routes(app):
             return jsonify({"status": "ok", "data": res.data[0]})
         except Exception as e:
             return jsonify({"error": str(e)}), 500
+
+    @app.route("/staff/change_password", methods=["POST"])
+    @jwt_required
+    def staff_change_password():
+        """本人によるパスワード変更（初回ログイン時の強制変更にも使用）"""
+        try:
+            data = request.get_json()
+            new_password = data.get("new_password", "").strip()
+            if not new_password or len(new_password) < 8:
+                return jsonify({"error": "パスワードは8文字以上で入力してください"}), 400
+            password_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+            supabase_staff.table("staff_master").update({
+                "password_hash": password_hash,
+                "password_changed": True
+            }).eq("staff_id", request.staff_id).execute()
+            return jsonify({"status": "ok"})
+        except Exception as e:
+            import traceback
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    @app.route("/staff/admin_reset_password", methods=["POST"])
+    @admin_required
+    def staff_admin_reset_password():
+        """管理者による特定スタッフのパスワードリセット（初期パスワードに戻し、未変更フラグも戻す）"""
+        try:
+            data = request.get_json()
+            staff_id = data.get("staff_id", "").strip()
+            if not staff_id:
+                return jsonify({"error": "staff_idが必要です"}), 400
+            default_password = "Dghojin2026"
+            password_hash = bcrypt.hashpw(default_password.encode(), bcrypt.gensalt()).decode()
+            supabase_staff.table("staff_master").update({
+                "password_hash": password_hash,
+                "password_changed": False
+            }).eq("staff_id", staff_id).execute()
+            return jsonify({"status": "ok"})
+        except Exception as e:
+            import traceback
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
     @app.route("/staff/debug_master")
     def debug_master():
