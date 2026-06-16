@@ -749,9 +749,9 @@ def register_staff_routes(app):
                     continue
                 cancel = str(row.get("cancel_date") or "")
                 if cancel and cancel not in ["None", ""]:
-                    results[sid]["cxl_amount"] += row.get("amount", 0)
+                    results[sid]["cxl_amount"] += row.get("achievement_amount", 0)
                 else:
-                    results[sid]["apo_amount"] += row.get("amount", 0)
+                    results[sid]["apo_amount"] += row.get("achievement_amount", 0)
                 results[sid]["fb_achievement"] += row.get("fb_amount", 0)
 
             for row in att_rows:
