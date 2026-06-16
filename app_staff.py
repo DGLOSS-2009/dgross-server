@@ -776,7 +776,7 @@ def register_staff_routes(app):
 
                 campaign_total = campaign_totals.get(sid, 0)
                 auto_total = auto_totals.get(sid, 0)
-                r["fb_amount"] = r["fb_achievement"] + campaign_total + auto_total
+                r["fb_amount"] = campaign_total + auto_total
 
                 # FB内訳にauto_fbを追加
                 for entry in auto_breakdown.get(sid, []):
