@@ -1,9 +1,10 @@
 import os
 import jwt
 import datetime
+import requests
 import calendar
 import bcrypt
-from flask import jsonify, request
+from flask import jsonify, request, send_file
 from supabase import create_client
 from openpyxl import load_workbook
 from functools import wraps
@@ -110,6 +111,8 @@ def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = request.headers.get("Authorization", "").replace("Bearer ", "")
+        if not token:
+            token = request.args.get("token", "")  # window.open等、ヘッダーを送れない場合のフォールバック
         if not token:
             return jsonify({"error": "認証が必要です"}), 401
         try:
@@ -618,6 +621,29 @@ def register_staff_routes(app):
             import traceback
             return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
+    @app.route("/staff/month_status")
+    @admin_required
+    def month_status():
+        """指定月の①目標値確定・②時給確定の状況を返す"""
+        try:
+            month = request.args.get("month")
+            if not month:
+                return jsonify({"error": "monthが必要です"}), 400
+            target_month = month + "-01"
+
+            targets_res = supabase_staff.table("monthly_targets")\
+                .select("is_confirmed").eq("target_month", target_month).execute()
+            target_confirmed = bool(targets_res.data) and all(t.get("is_confirmed") for t in targets_res.data)
+
+            wage_res = supabase_staff.table("wage_confirm_status")\
+                .select("*").eq("target_month", target_month).execute()
+            wage_confirmed = bool(wage_res.data) and wage_res.data[0].get("is_confirmed", False)
+
+            return jsonify({"status": "ok", "target_confirmed": target_confirmed, "wage_confirmed": wage_confirmed})
+        except Exception as e:
+            import traceback
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
     @app.route("/staff/confirm_month", methods=["POST"])
     @admin_required
     def confirm_month():
@@ -649,6 +675,195 @@ def register_staff_routes(app):
                 }, on_conflict="staff_id,target_month").execute()
 
             return jsonify({"status": "ok", "message": f"{month}を確定しました"})
+        except Exception as e:
+            import traceback
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    @app.route("/staff/unconfirm_month", methods=["POST"])
+    @admin_required
+    def unconfirm_month():
+        """目標値確定の解除。時給確定が済んでいる場合はエラーで止める"""
+        try:
+            data = request.get_json()
+            month = data.get("month")
+            if not month:
+                return jsonify({"error": "monthが必要です"}), 400
+            target_month = month + "-01"
+
+            wage_status_res = supabase_staff.table("wage_confirm_status")\
+                .select("*").eq("target_month", target_month).execute()
+            if wage_status_res.data and wage_status_res.data[0].get("is_confirmed"):
+                return jsonify({"error": "時給確定が済んでいるため解除できません。先に時給確定を解除してください"}), 400
+
+            supabase_staff.table("monthly_targets")\
+                .update({"is_confirmed": False, "confirmed_work_days": None})\
+                .eq("target_month", target_month).execute()
+
+            return jsonify({"status": "ok", "message": f"{month}の目標値確定を解除しました"})
+        except Exception as e:
+            import traceback
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    @app.route("/staff/confirm_wage", methods=["POST"])
+    @admin_required
+    def confirm_wage():
+        """確定時給を確定し、履歴テーブルに保存する。目標値確定が済んでいない月はエラー"""
+        try:
+            data = request.get_json()
+            month = data.get("month")
+            if not month:
+                return jsonify({"error": "monthが必要です"}), 400
+            target_month = month + "-01"
+
+            targets_res = supabase_staff.table("monthly_targets")\
+                .select("*").eq("target_month", target_month).execute()
+            if not targets_res.data or not any(t.get("is_confirmed") for t in targets_res.data):
+                return jsonify({"error": "目標値確定が済んでいないため、時給確定できません"}), 400
+
+            # 現在の/staff/summaryと同じロジックで確定時給を算出（自己呼び出し）
+            base_url = request.host_url.rstrip("/")
+            summary_resp = requests.get(f"{base_url}/staff/summary", params={"month": month})
+            summary_res = summary_resp.json()
+            if "error" in summary_res:
+                return jsonify(summary_res), 500
+
+            rows = []
+            for r in summary_res["data"]:
+                if r.get("confirmed_wage") is not None:
+                    rows.append({
+                        "staff_id": r["staff_id"],
+                        "target_month": target_month,
+                        "confirmed_wage": r["confirmed_wage"],
+                        "wage_change_label": r["confirmed_wage_change"]
+                    })
+            if rows:
+                supabase_staff.table("confirmed_wage_history")\
+                    .upsert(rows, on_conflict="staff_id,target_month").execute()
+
+            supabase_staff.table("wage_confirm_status").upsert({
+                "target_month": target_month,
+                "is_confirmed": True,
+                "confirmed_at": datetime.datetime.utcnow().isoformat()
+            }).execute()
+
+            return jsonify({"status": "ok", "message": f"{month}の時給を確定しました", "count": len(rows)})
+        except Exception as e:
+            import traceback
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    @app.route("/staff/unconfirm_wage", methods=["POST"])
+    @admin_required
+    def unconfirm_wage():
+        """時給確定の解除"""
+        try:
+            data = request.get_json()
+            month = data.get("month")
+            if not month:
+                return jsonify({"error": "monthが必要です"}), 400
+            target_month = month + "-01"
+
+            supabase_staff.table("wage_confirm_status")\
+                .update({"is_confirmed": False}).eq("target_month", target_month).execute()
+            supabase_staff.table("confirmed_wage_history")\
+                .delete().eq("target_month", target_month).execute()
+
+            return jsonify({"status": "ok", "message": f"{month}の時給確定を解除しました"})
+        except Exception as e:
+            import traceback
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    # ============================================================
+    # Excel出力（インセンティブ支給額・確定時給）
+    # ============================================================
+    @app.route("/staff/export/incentive_payout")
+    @admin_required
+    def export_incentive_payout():
+        try:
+            from openpyxl import Workbook
+            import io
+
+            month = request.args.get("month")
+            if not month:
+                return jsonify({"error": "monthが必要です"}), 400
+
+            base_url = request.host_url.rstrip("/")
+            summary_resp = requests.get(f"{base_url}/staff/summary", params={"month": month})
+            summary_data = summary_resp.json().get("data", [])
+
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "インセンティブ支給額"
+            ws.append(["社員番号", "スタッフ名", "支払金額"])
+            for r in summary_data:
+                if r.get("incentive_payout_status") == "ok" and r.get("incentive_payout", 0) > 0:
+                    ws.append([r["staff_id"], r["name"], r["incentive_payout"]])
+
+            buf = io.BytesIO()
+            wb.save(buf)
+            buf.seek(0)
+            return send_file(buf, download_name=f"インセンティブ支給額_{month}.xlsx",
+                              as_attachment=True, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        except Exception as e:
+            import traceback
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    @app.route("/staff/export/confirmed_wage")
+    @admin_required
+    def export_confirmed_wage():
+        try:
+            from openpyxl import Workbook
+            import io
+
+            month = request.args.get("month")
+            if not month:
+                return jsonify({"error": "monthが必要です"}), 400
+
+            target_month = month + "-01"
+            prev_month = shift_month(target_month, -1)[:7]
+
+            master = load_staff_master()
+
+            # 次月時給＝前月分の確定時給履歴
+            prev_history_res = supabase_staff.table("confirmed_wage_history")\
+                .select("*").eq("target_month", prev_month + "-01").execute()
+            prev_history_map = {h["staff_id"]: h for h in prev_history_res.data}
+
+            # 翌々月時給＝当月の確定時給結果（履歴に保存済みであれば使用、なければ計算結果から取得）
+            cur_history_res = supabase_staff.table("confirmed_wage_history")\
+                .select("*").eq("target_month", target_month).execute()
+            cur_history_map = {h["staff_id"]: h for h in cur_history_res.data}
+
+            if not cur_history_map:
+                base_url = request.host_url.rstrip("/")
+                summary_resp = requests.get(f"{base_url}/staff/summary", params={"month": month})
+                summary_data = summary_resp.json().get("data", [])
+                for r in summary_data:
+                    if r.get("confirmed_wage") is not None:
+                        cur_history_map[r["staff_id"]] = {
+                            "confirmed_wage": r["confirmed_wage"],
+                            "wage_change_label": r["confirmed_wage_change"]
+                        }
+
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "確定時給"
+            ws.append(["社員番号", "オペレーター名", "次月時給", "翌々月時給", "変給対象"])
+
+            for sid, info in master.items():
+                prev = prev_history_map.get(sid)
+                cur = cur_history_map.get(sid)
+                next_wage = prev["confirmed_wage"] if prev else None
+                next_next_wage = cur["confirmed_wage"] if cur else None
+                change_mark = "レ" if (next_wage is not None and next_next_wage is not None and next_wage != next_next_wage) else ""
+                if next_wage is None and next_next_wage is None:
+                    continue
+                ws.append([sid, info["staff_name"], next_wage, next_next_wage, change_mark])
+
+            buf = io.BytesIO()
+            wb.save(buf)
+            buf.seek(0)
+            return send_file(buf, download_name=f"確定時給_{month}.xlsx",
+                              as_attachment=True, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         except Exception as e:
             import traceback
             return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
