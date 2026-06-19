@@ -867,6 +867,99 @@ def register_staff_routes(app):
             import traceback
             return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
+    @app.route("/staff/export/fb_campaign_detail")
+    @admin_required
+    def export_fb_campaign_detail():
+        """FBキャンペーン詳細リストのExcel出力（シート1：キャンペーン一覧、シート2：スタッフ別FB受取明細）"""
+        try:
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+            import io
+
+            month = request.args.get("month")
+            if not month:
+                return jsonify({"error": "monthが必要です"}), 400
+
+            campaigns_res = supabase_staff.table("fb_campaigns").select("*").execute()
+            campaigns = campaigns_res.data
+
+            summary_res = build_staff_summary(month)
+            summary_data = summary_res.get("data", [])
+
+            wb = Workbook()
+
+            header_font = Font(bold=True, color="FFFFFF", name="Arial", size=10)
+            header_fill_blue = PatternFill("solid", fgColor="005BAC")
+            header_fill_green = PatternFill("solid", fgColor="375623")
+            left = Alignment(horizontal="left", vertical="center")
+            thin = Side(style="thin", color="CCCCCC")
+            thin_border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+            def style_header(ws, row, col_count, fill):
+                for c in range(1, col_count + 1):
+                    cell = ws.cell(row=row, column=c)
+                    cell.font = header_font
+                    cell.fill = fill
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                    cell.border = thin_border
+
+            def style_data_row(ws, row, col_count):
+                for c in range(1, col_count + 1):
+                    cell = ws.cell(row=row, column=c)
+                    cell.alignment = left
+                    cell.border = thin_border
+
+            # シート1：キャンペーン一覧
+            ws1 = wb.active
+            ws1.title = "キャンペーン一覧"
+            headers1 = ["キャンペーン名", "カテゴリ", "計算方式", "開始日", "終了日", "金額", "対象種別", "対象スタッフ数"]
+            for c, h in enumerate(headers1, 1):
+                ws1.cell(row=1, column=c, value=h)
+            style_header(ws1, 1, len(headers1), header_fill_blue)
+            for w, col in zip([28, 18, 14, 12, 12, 14, 20, 14], ["A","B","C","D","E","F","G","H"]):
+                ws1.column_dimensions[col].width = w
+
+            calc_label = {"per_unit": "件数×単価", "fixed": "固定額", "bulk": "一括付与"}
+            for row_idx, c in enumerate(campaigns, 2):
+                types_str = "・".join(c.get("target_types") or []) or "全種別"
+                staff_count = len(c.get("target_staff_ids") or [])
+                staff_str = f"{staff_count}名指定" if staff_count > 0 else "全員"
+                vals = [c.get("name",""), c.get("category",""),
+                        calc_label.get(c.get("calc_type",""), c.get("calc_type","")),
+                        c.get("start_date",""), c.get("end_date",""),
+                        c.get("amount", 0), types_str, staff_str]
+                for col, v in enumerate(vals, 1):
+                    ws1.cell(row=row_idx, column=col, value=v)
+                style_data_row(ws1, row_idx, len(headers1))
+
+            # シート2：スタッフ別FB受取明細
+            ws2 = wb.create_sheet(title="スタッフ別FB受取明細")
+            headers2 = ["社員番号", "スタッフ名", "サイト", "キャンペーン名", "カテゴリ", "金額"]
+            for c, h in enumerate(headers2, 1):
+                ws2.cell(row=1, column=c, value=h)
+            style_header(ws2, 1, len(headers2), header_fill_green)
+            for w, col in zip([14, 22, 14, 28, 18, 14], ["A","B","C","D","E","F"]):
+                ws2.column_dimensions[col].width = w
+
+            row_idx = 2
+            for staff in sorted(summary_data, key=lambda x: x.get("site","") + x.get("name","")):
+                for item in (staff.get("fb_breakdown") or []):
+                    vals2 = [staff.get("staff_id",""), staff.get("name",""), staff.get("site",""),
+                             item.get("name",""), item.get("category",""), item.get("amount", 0)]
+                    for col, v in enumerate(vals2, 1):
+                        ws2.cell(row=row_idx, column=col, value=v)
+                    style_data_row(ws2, row_idx, len(headers2))
+                    row_idx += 1
+
+            buf = io.BytesIO()
+            wb.save(buf)
+            buf.seek(0)
+            return send_file(buf, download_name=f"FBキャンペーン詳細_{month}.xlsx",
+                              as_attachment=True, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        except Exception as e:
+            import traceback
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
     # ============================================================
     # FBキャンペーン管理
     # ============================================================
