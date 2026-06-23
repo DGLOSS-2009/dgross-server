@@ -56,7 +56,7 @@ def get_supabase() -> Client:
     return _supabase_client
 
 # GitHubからスタッフマスターを自動読み込み
-MASTER_URL = 'https://raw.githubusercontent.com/DGLOSS-2009/digross-server/main/%E3%82%B9%E3%82%BF%E3%83%83%E3%83%95%E3%83%9E%E3%82%B9%E3%82%BF%E3%83%BC.xlsx'
+MASTER_URL = 'https://raw.githubusercontent.com/DGLOSS-2009/dgross-server/main/%E3%82%B9%E3%82%BF%E3%83%83%E3%83%95%E3%83%9E%E3%82%B9%E3%82%BF%E3%83%BC.xlsx'
 _master_cache = None
 
 def get_master_from_github():
