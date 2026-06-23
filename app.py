@@ -1,2051 +1,1110 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PT事業部 売上管理ダッシュボード</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<style>
-:root{--orange:#D85A30;--orange-light:#FAECE7;--red:#E24B4A;--red-light:#FCEBEB;--green:#3B6D11;--green-light:#EAF3DE;--blue:#185FA5;--blue-light:#E6F1FB;--amber:#854F0B;--amber-light:#FAEEDA;--gray:#5F5E5A;--gray-light:#F1EFE8;--border:rgba(0,0,0,0.12);--bg:#F5F4F0;--white:#FFFFFF;--text:#1A1A1A;--text2:#555;--text3:#888;--sidebar:220px;--header:52px}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);font-size:13px;min-height:100vh}
-.layout{display:flex;min-height:100vh}
-.sidebar{width:var(--sidebar);background:var(--white);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100}
-.main{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column;min-height:100vh}
-.header{height:var(--header);background:var(--white);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0;z-index:50}
-.content{padding:16px;flex:1}
-.sidebar-logo{padding:16px 18px 14px;border-bottom:1px solid var(--border)}
-.logo-icon{width:30px;height:30px;background:var(--orange);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.logo-icon svg{width:16px;height:16px;fill:#fff}
-.logo-mark{display:flex;align-items:center;gap:8px}
-.logo-text{font-size:13px;font-weight:500}
-.logo-sub{font-size:10px;color:var(--text3);margin-top:1px}
-.nav{padding:10px 0;flex:1}
-.nav-section{font-size:10px;font-weight:500;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;padding:8px 18px 3px}
-.nav-item{display:flex;align-items:center;gap:9px;padding:8px 18px;cursor:pointer;color:var(--text2);transition:all .15s;border-left:2px solid transparent;font-size:12px}
-.nav-item:hover{background:var(--bg);color:var(--text)}
-.nav-item.active{color:var(--orange);font-weight:500;border-left-color:var(--orange);background:var(--orange-light)}
-.nav-item svg{width:15px;height:15px;flex-shrink:0;opacity:.7}
-.nav-item.active svg{opacity:1}
-.sidebar-footer{padding:14px 18px;border-top:1px solid var(--border)}
-.user-info{display:flex;align-items:center;gap:8px}
-.user-avatar{width:28px;height:28px;background:var(--orange);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:500;flex-shrink:0}
-.user-name{font-size:12px;font-weight:500}
-.user-role{font-size:10px;color:var(--text3)}
-.page-title{font-size:14px;font-weight:500}
-.header-right{display:flex;align-items:center;gap:10px}
-.update-badge{font-size:11px;color:var(--text3)}
-.site-tabs{display:flex;gap:2px;background:#EDEDEB;border-radius:7px;padding:3px}
-.site-tab{font-size:12px;padding:4px 14px;border-radius:5px;cursor:pointer;color:var(--text2);transition:all .15s;white-space:nowrap}
-.site-tab.active{background:var(--white);color:var(--text);font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-.page{display:none}.page.active{display:block}
-
-/* KPIグリッド */
-.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px}
-.kpi-card{background:var(--white);border:1px solid var(--border);border-radius:9px;padding:12px 14px;border-top:2px solid transparent;position:relative}
-.kpi-card.c-orange{border-top-color:var(--orange)}
-.kpi-card.c-red{border-top-color:var(--red)}
-.kpi-card.c-green{border-top-color:var(--green)}
-.kpi-card.c-gray{border-top-color:var(--gray)}
-.kpi-label{font-size:10px;color:var(--text3);margin-bottom:4px;font-weight:500}
-.kpi-value{font-size:16px;font-weight:500;line-height:1.2;letter-spacing:-.01em}
-.kpi-sub{font-size:10px;color:var(--text3);margin-top:3px}
-.kpi-diff{font-size:11px;font-weight:500;margin-top:2px}
-.c-neg{color:var(--red)}.c-pos{color:var(--green)}.c-warn{color:var(--amber)}
-
-/* ランク別テーブル */
-.section-row{display:grid;grid-template-columns:3fr 2fr;gap:10px;margin-bottom:12px}
-.card{background:var(--white);border:1px solid var(--border);border-radius:9px;padding:14px 16px}
-.card-title{font-size:11px;font-weight:500;color:var(--text2);margin-bottom:12px;letter-spacing:.04em}
-.data-table{width:100%;border-collapse:collapse;font-size:11px}
-.data-table th{text-align:left;padding:5px 8px;color:var(--text3);border-bottom:1px solid var(--border);font-weight:400;white-space:nowrap}
-.data-table th.r,.data-table td.r{text-align:right}
-.data-table td{padding:6px 8px;border-bottom:1px solid #F5F4F0;white-space:nowrap}
-.data-table tr:last-child td{border-bottom:none}
-.data-table tr:hover td{background:#FAFAF8}
-.rank-badge{display:inline-block;font-size:10px;padding:1px 7px;border-radius:4px;font-weight:500}
-.rb-top{background:var(--blue-light);color:var(--blue)}
-.rb-mid{background:var(--green-light);color:var(--green)}
-.rb-rookie{background:var(--gray-light);color:var(--gray)}
-.rb-mgr{background:var(--amber-light);color:var(--amber)}
-
-/* サブKPI */
-.sub-kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.sub-kpi{background:#F8F7F4;border-radius:7px;padding:10px 12px}
-.sub-kpi-label{font-size:10px;color:var(--text3);margin-bottom:3px}
-.sub-kpi-value{font-size:14px;font-weight:500}
-.sub-kpi-sub{font-size:10px;color:var(--text3);margin-top:2px}
-
-/* ボトムロウ */
-.bottom-row{display:grid;grid-template-columns:1.8fr 1fr;gap:10px;margin-bottom:12px}
-.chart-wrap{height:150px;position:relative}
-
-/* ヒートマップ */
-.hm-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #F5F4F0;font-size:11px}
-.hm-row:last-child{border-bottom:none}
-.hm-rank{font-weight:500;color:var(--text3);width:14px;text-align:center;font-size:10px;flex-shrink:0}
-.hm-name{flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hm-bar-bg{width:56px;height:4px;background:#EDEDEB;border-radius:2px;overflow:hidden;flex-shrink:0}
-.hm-bar-fill{height:100%;background:var(--orange);border-radius:2px}
-.hm-val{font-weight:500;min-width:72px;text-align:right;flex-shrink:0}
-
-/* OP個人実績 */
-.op-summary-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px}
-.search-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-.search-input{border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;width:200px;font-family:inherit}
-.search-input:focus{outline:none;border-color:var(--orange)}
-
-/* ソート・フィルターヘッダー */
-.sh{cursor:pointer;user-select:none;white-space:nowrap}
-.sh:hover{background:var(--bg)}
-.sh-icon{font-size:9px;color:var(--text3);margin-left:2px}
-.sh.asc .sh-icon::before{content:'▲';color:var(--orange)}
-.sh.desc .sh-icon::before{content:'▼';color:var(--orange)}
-.sh.asc .sh-icon,.sh.desc .sh-icon{font-size:0}
-.sh-menu-item{padding:6px 12px;font-size:12px;cursor:pointer;border-radius:4px}
-.sh-menu-item:hover{background:var(--bg)}
-/* 更新進捗ステップ */
-.step-item{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg);transition:all .3s}
-.step-item.active{border-color:var(--orange);background:var(--orange-light)}
-.step-item.done{border-color:var(--green);background:var(--green-light)}
-.step-item.error{border-color:var(--red);background:var(--red-light)}
-.step-num{width:18px;height:18px;border-radius:50%;background:var(--border);color:var(--text3);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center}
-.step-item.active .step-num{background:var(--orange);color:#fff}
-.step-item.done .step-num{background:var(--green);color:#fff}
-.step-item.done .step-num::after{content:'✓';font-size:10px}
-.step-item.error .step-num{background:var(--red);color:#fff}
-.step-label{font-size:11px;color:var(--text2)}
-.step-item.active .step-label{color:var(--orange);font-weight:500}
-.step-item.done .step-label{color:var(--green)}
-.step-arrow{font-size:10px;color:var(--text3)}
-.daily-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-
-/* 進捗バー */
-.prog-wrap{display:flex;align-items:center;gap:6px;margin-top:5px}
-.prog-bg{flex:1;height:3px;background:#EDEDEB;border-radius:2px;overflow:hidden}
-.prog-fill{height:100%;border-radius:2px}
-
-/* アラート */
-.alert{background:#FEF8F0;border:1px solid #F0C88A;border-radius:7px;padding:8px 14px;font-size:11px;color:#7A4A10;margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.alert-dot{width:6px;height:6px;border-radius:50%;background:#D4860A;flex-shrink:0}
-
-/* 設定 */
-.setting-input{width:100%;border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:13px;font-family:inherit}
-.setting-input:focus{outline:none;border-color:var(--orange)}
-.btn{padding:7px 18px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500}
-.btn-primary{background:var(--orange);border:none;color:#fff}
-.btn-secondary{background:var(--white);border:1px solid var(--border);color:var(--text2)}
-
-/* ファイルドロップ */
-.file-drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:2px dashed var(--border);border-radius:9px;padding:16px;cursor:pointer;transition:all .15s;background:var(--white);min-height:80px}
-.file-drop:hover{border-color:var(--orange);background:var(--orange-light)}
-.file-drop.selected{border-color:var(--green);background:var(--green-light)}
-.file-drop-text{font-size:11px;color:var(--text2);text-align:center;word-break:break-all}
-</style>
-</head>
-<body>
-<div class="layout">
-<div class="sidebar">
-  <div class="sidebar-logo">
-    <div class="logo-mark">
-      <div class="logo-icon"><svg viewBox="0 0 24 24"><path d="M3 3h18v2H3V3zm0 4h12v2H3V7zm0 4h18v2H3v-2zm0 4h12v2H3v-2zm0 4h18v2H3v-2z"/></svg></div>
-      <div><div class="logo-text">PT事業部</div><div class="logo-sub">売上管理システム</div></div>
-    </div>
-  </div>
-  <nav class="nav">
-    <div class="nav-section">メイン</div>
-    <div class="nav-item active" onclick="showPage('dashboard',this)">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>ダッシュボード
-    </div>
-    <div class="nav-item" onclick="showPage('daily',this)">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>日次明細
-    </div>
-    <div class="nav-item" onclick="showPage('operator',this)">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>OP個人実績
-    </div>
-    <div class="nav-section">管理</div>
-    <div class="nav-item" onclick="showPage('import',this)">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>データ取込
-    </div>
-    <div class="nav-item" onclick="showPage('revenue',this)">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>追加収益
-    </div>
-    <div class="nav-item" onclick="showPage('export',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>データ出力
-    </div>
-    <div class="nav-section">設定</div>
-    <div class="nav-item" onclick="showPage('settings',this)">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>設定
-    </div>
-  </nav>
-  <div class="sidebar-footer">
-    <div class="user-info">
-      <div class="user-avatar">皆</div>
-      <div><div class="user-name">皆川 大輔</div><div class="user-role">管理者</div></div>
-    </div>
-  </div>
-</div>
-
-<div class="main">
-  <div class="header">
-    <div style="display:flex;align-items:center;gap:14px">
-      <div class="page-title" id="pageTitle">ダッシュボード</div>
-      <span class="update-badge" id="updateTime"></span>
-    </div>
-    <div class="header-right">
-      <button onclick="goTop()" style="display:flex;align-items:center;gap:5px;padding:4px 12px;border:1px solid var(--border);border-radius:20px;background:var(--white);color:var(--text2);font-size:12px;font-family:inherit;cursor:pointer;transition:all .15s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='var(--white)'">
-        <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-        トップ
-      </button>
-      <div style="position:relative">
-        <select id="monthSelect" onchange="goToMonth(this.value)" style="background:var(--orange-light);color:var(--orange);border:none;border-radius:20px;padding:4px 28px 4px 12px;font-size:12px;font-weight:500;font-family:inherit;cursor:pointer;appearance:none;-webkit-appearance:none;outline:none">
-        </select>
-        <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:10px;color:var(--orange)">▼</span>
-      </div>
-      <div class="site-tabs" id="siteTabs">
-        <div class="site-tab active" onclick="switchSite('all',this)">全体</div>
-        <div class="site-tab" onclick="switchSite('shinjuku',this)">六本木SC</div>
-        <div class="site-tab" onclick="switchSite('remote',this)">リモートSC</div>
-        
-      </div>
-    </div>
-  </div>
-
-  <div class="content">
-
-    <!-- DASHBOARD -->
-    <div class="page active" id="page-dashboard">
-      <div class="alert"><div class="alert-dot"></div><span id="alertText"></span></div>
-
-      <div class="kpi-grid" id="kpi-main"></div>
-
-      <div class="section-row">
-        <div class="card">
-          <div class="card-title">ランク別実績（累計<span id="elapsed-label">0</span>営業日）</div>
-          <table class="data-table" id="rank-table"><thead><tr><th>ランク</th><th class="r">売上</th><th class="r">原価率</th><th class="r">単価/日</th><th class="r">在籍</th><th class="r">稼働</th></tr></thead><tbody id="rank-tbody"></tbody></table>
-        </div>
-        <div class="card">
-          <div class="sub-kpi-grid" id="sub-kpi"></div>
-        </div>
-      </div>
-
-      <div class="bottom-row">
-        <div class="card">
-          <div class="card-title">日次売上推移　<span style="color:var(--red);font-size:10px">- - - 日割り目標</span></div>
-          <div class="chart-wrap"><canvas id="dailyChart"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-title">案件 TOP20（累計売上）</div>
-          <div id="heatmap-list"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- DAILY -->
-    <div class="page" id="page-daily">
-      <!-- 上段：グラフ2枚横並び -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-        <div class="card">
-          <div class="card-title">日次売上推移</div>
-          <div class="chart-wrap" style="height:180px"><canvas id="dailyChart2"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-title">日次原価率推移</div>
-          <div class="chart-wrap" style="height:180px"><canvas id="costRateChart"></canvas></div>
-        </div>
-      </div>
-      <!-- 下段：日次明細テーブル全幅 -->
-      <div class="card" style="padding:0;overflow:hidden">
-        <div style="padding:14px 16px 0"><div class="card-title">日次明細</div></div>
-        <div style="overflow-x:auto">
-          <table class="data-table">
-            <thead><tr><th>営業日</th><th>日付</th><th class="r">売上</th><th class="r">アポ</th><th class="r">CXL</th><th class="r">有効</th><th class="r">稼働</th><th class="r">コール</th><th class="r">単価/1アポ</th><th class="r">人件費</th><th class="r">原価率</th><th></th></tr></thead>
-            <tbody id="daily-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- OPERATOR -->
-    <div class="page" id="page-operator">
-      <div class="op-summary-grid" id="op-summary"></div>
-      <!-- フィルターバー -->
-      <div class="search-bar" style="gap:8px;flex-wrap:wrap">
-        <input type="text" class="search-input" id="op-search" placeholder="氏名で検索..." oninput="renderOpTable(currentSite)" style="flex:1;min-width:160px">
-        <select id="op-rank-filter" onchange="renderOpTable(currentSite)" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text);background:var(--white);cursor:pointer">
-          <option value="">全ランク</option>
-          <option value="トップ">トップ</option>
-          <option value="ミドル">ミドル</option>
-          <option value="ルーキープラス">ルーキープラス</option>
-          <option value="ルーキー">ルーキー</option>
-          <option value="管理者">管理者</option>
-          <option value="社員">社員</option>
-        </select>
-        <select id="op-site-filter" onchange="renderOpTable(currentSite)" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text);background:var(--white);cursor:pointer">
-          <option value="">全サイト</option>
-          <option value="六本木SC">六本木SC</option>
-          <option value="六本木SC">六本木SC</option>
-          <option value="リモートSC">リモートSC</option>
-        </select>
-        <span id="op-count" style="font-size:11px;color:var(--text3);white-space:nowrap;align-self:center"></span>
-        <button onclick="showPage('op-full',null)" style="padding:5px 14px;border:1px solid var(--orange);border-radius:6px;background:var(--white);color:var(--orange);font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap">全体を見る →</button>
-      </div>
-      <div class="card" style="padding:0;overflow:hidden">
-        <div style="padding:10px 16px 6px;display:flex;align-items:center;justify-content:space-between">
-          <div style="font-size:11px;color:var(--text3)">売上TOP10</div>
-        </div>
-        <div style="overflow-x:auto">
-          <table class="data-table" id="op-top10-table">
-            <thead><tr>
-              <th>氏名</th><th>ランク</th><th>サイト</th>
-              <th class="r sh" data-col="sales">売上 <span class="sh-icon">▼</span></th>
-              <th class="r sh" data-col="apo">アポ <span class="sh-icon">▼</span></th>
-              <th class="r sh" data-col="cancel">CXL <span class="sh-icon">▼</span></th>
-              <th class="r sh" data-col="valid">有効 <span class="sh-icon">▼</span></th>
-              <th class="r sh" data-col="calls">コール <span class="sh-icon">▼</span></th>
-              <th class="r sh" data-col="apoRate">アポ率 <span class="sh-icon">▼</span></th>
-              <th class="r sh" data-col="unitPerDay">単価/日 <span class="sh-icon">▼</span></th>
-              <th class="r sh" data-col="workH">労働時間 <span class="sh-icon">▼</span></th>
-              <th class="r">インセンティブ</th>
-              <th class="r sh" data-col="costRate">原価率 <span class="sh-icon">▼</span></th>
-            </tr></thead>
-            <tbody id="op-top10-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-      <!-- ソート・フィルターメニュー -->
-      <div id="sh-menu" style="display:none;position:fixed;z-index:300;background:var(--white);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);padding:8px;min-width:180px">
-        <div style="font-size:11px;color:var(--text3);padding:4px 8px;margin-bottom:4px" id="sh-menu-col"></div>
-        <div class="sh-menu-item" onclick="opSort('asc')">▲ 昇順で並べ替え</div>
-        <div class="sh-menu-item" onclick="opSort('desc')">▼ 降順で並べ替え</div>
-        <div style="border-top:1px solid var(--border);margin:4px 0"></div>
-        <div style="padding:4px 8px">
-          <input id="sh-val-min" type="number" placeholder="最小値" style="width:100%;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:11px;margin-bottom:4px">
-          <input id="sh-val-max" type="number" placeholder="最大値" style="width:100%;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:11px;margin-bottom:6px">
-          <button onclick="opFilterApply()" style="width:100%;padding:4px;background:var(--orange);color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer">絞り込む</button>
-          <button onclick="opFilterClear()" style="width:100%;padding:4px;background:var(--bg);color:var(--text2);border:1px solid var(--border);border-radius:4px;font-size:11px;cursor:pointer;margin-top:4px">クリア</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- データ出力ページ -->
-    <div class="page" id="page-export">
-      <div class="card" style="margin-bottom:12px">
-        <div style="padding:14px 16px 0"><div class="card-title">出力データを選択</div></div>
-        <div style="padding:12px 16px 16px;display:flex;flex-direction:column;gap:8px">
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-            <input type="checkbox" id="ex-op" checked style="width:15px;height:15px"> OP個人実績
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-            <input type="checkbox" id="ex-daily" checked style="width:15px;height:15px"> 日次明細
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-            <input type="checkbox" id="ex-rank" style="width:15px;height:15px"> ランク別集計
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-            <input type="checkbox" id="ex-heat" style="width:15px;height:15px"> ヒートマップ（案件別）
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-            <input type="checkbox" id="ex-sites" style="width:15px;height:15px"> サイト別集計
-          </label>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="card" style="padding:16px">
-          <div style="font-size:13px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:6px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            JSON出力
-          </div>
-          <div style="font-size:11px;color:var(--text3);margin-bottom:12px">選択した項目をまとめてJSONで出力</div>
-          <button class="btn btn-primary" onclick="exportJSON()" style="width:100%;justify-content:center;display:flex;align-items:center;gap:5px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            ダウンロード
-          </button>
-        </div>
-        <div class="card" style="padding:16px">
-          <div style="font-size:13px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:6px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
-            CSV出力
-          </div>
-          <div style="font-size:11px;color:var(--text3);margin-bottom:12px">OP個人実績・日次明細をCSVで出力（Excel対応）</div>
-          <button class="btn" onclick="exportCSV()" style="width:100%;justify-content:center;display:flex;align-items:center;gap:5px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            ダウンロード
-          </button>
-        </div>
-      </div>
-      <div id="export-status" style="margin-top:10px;font-size:12px;color:var(--text3)"></div>
-    </div>
-<!-- メンバー一覧モーダル -->
-<!-- 日次明細モーダル（案件内訳＋個人成果タブ切替） -->
-<div id="daily-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;align-items:center;justify-content:center" onclick="closeDailyModal(event)">
-  <div style="background:var(--white);border-radius:12px;padding:20px;width:min(580px,96vw);max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.18)" onclick="event.stopPropagation()">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <div>
-        <div id="daily-modal-title" style="font-size:15px;font-weight:600"></div>
-        <div id="daily-modal-sub" style="font-size:11px;color:var(--text3);margin-top:2px"></div>
-      </div>
-      <button onclick="closeDailyModal()" style="background:none;border:none;font-size:18px;color:var(--text3);cursor:pointer;padding:4px">✕</button>
-    </div>
-    <!-- サマリー -->
-    <div id="daily-modal-summary" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px"></div>
-    <!-- タブ -->
-    <div style="display:flex;gap:6px;margin-bottom:12px">
-      <button id="dtab-proj" onclick="switchDailyTab('proj')" style="padding:5px 14px;border-radius:20px;border:1px solid var(--orange);background:var(--orange);color:#fff;font-size:12px;cursor:pointer;font-weight:500">案件内訳</button>
-      <button id="dtab-ops" onclick="switchDailyTab('ops')" style="padding:5px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg);color:var(--text2);font-size:12px;cursor:pointer">個人成果</button>
-    </div>
-    <!-- 案件内訳タブ -->
-    <div id="daily-tab-proj">
-      <div id="daily-proj-list" style="display:flex;flex-direction:column;gap:8px"></div>
-    </div>
-    <!-- 個人成果タブ -->
-    <div id="daily-tab-ops" style="display:none">
-      <table class="data-table" style="width:100%">
-        <thead><tr><th>#</th><th>氏名</th><th>アポ案件（件数）</th><th class="r">売上</th><th class="r">原価率</th></tr></thead>
-        <tbody id="daily-ops-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-<div id="member-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;align-items:center;justify-content:center" onclick="closeMemberModal(event)">
-  <div style="background:var(--white);border-radius:12px;padding:20px;width:min(540px,94vw);max-height:82vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.18)" onclick="event.stopPropagation()">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <div>
-        <div id="member-modal-title" style="font-size:15px;font-weight:600"></div>
-        <div id="member-modal-sub" style="font-size:11px;color:var(--text3);margin-top:2px"></div>
-      </div>
-      <button onclick="closeMemberModal()" style="background:none;border:none;font-size:18px;color:var(--text3);cursor:pointer;padding:4px">✕</button>
-    </div>
-    <div id="member-site-tabs" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap"></div>
-    <table class="data-table" style="width:100%">
-      <thead><tr><th>#</th><th>氏名</th><th>ランク</th><th>サイト</th><th class="r">売上</th></tr></thead>
-      <tbody id="member-modal-tbody"></tbody>
-    </table>
-  </div>
-</div>
-<div id="project-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;align-items:center;justify-content:center" onclick="closeProjectModal(event)">
-  <div style="background:var(--white);border-radius:12px;padding:24px;width:min(480px,92vw);max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)" onclick="event.stopPropagation()">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div>
-        <div id="proj-modal-name" style="font-size:15px;font-weight:600"></div>
-        <div id="proj-modal-sub" style="font-size:11px;color:var(--text3);margin-top:2px"></div>
-      </div>
-      <button onclick="closeProjectModal()" style="background:none;border:none;font-size:18px;color:var(--text3);cursor:pointer;padding:4px">✕</button>
-    </div>
-    <table class="data-table" style="width:100%">
-      <thead><tr><th>案件名</th><th class="r">獲得</th><th class="r">CXL</th><th class="r">有効</th><th class="r">売上</th></tr></thead>
-      <tbody id="proj-modal-tbody"></tbody>
-    </table>
-  </div>
-</div>
-    <div class="page" id="page-op-full">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-        <button onclick="showPage('operator',null)" style="padding:5px 14px;border:1px solid var(--border);border-radius:6px;background:var(--white);color:var(--text2);font-size:12px;cursor:pointer">← 戻る</button>
-        <div style="font-size:13px;font-weight:500">OP個人実績（全体）</div>
-        <span id="op-full-count" style="font-size:11px;color:var(--text3)"></span>
-      </div>
-      <div class="card" style="padding:0;overflow:hidden">
-        <div style="overflow-x:auto">
-          <table class="data-table">
-            <thead><tr>
-              <th>氏名</th><th>ランク</th><th>サイト</th>
-              <th class="r">売上</th><th class="r">アポ</th><th class="r">CXL</th><th class="r">有効</th>
-              <th class="r">コール</th><th class="r">アポ率</th><th class="r">単価/日</th>
-              <th class="r">労働時間</th><th class="r">インセンティブ</th><th class="r">原価率</th>
-            </tr></thead>
-            <tbody id="op-full-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- IMPORT -->
-    <div class="page" id="page-import">
-      <div class="card" style="margin-bottom:12px">
-        <div class="card-title">データ取込</div>
-        <div class="alert" style="margin-bottom:14px"><div class="alert-dot"></div>3ファイルを選択して「更新する」をクリックしてください。自動で集計・反映されます。</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-          <div><div style="font-size:11px;font-weight:500;color:var(--text3);margin-bottom:6px">① アポイントリスト <span style="color:var(--red)">*必須</span></div>
-            <div class="file-drop" id="drop-apo" onclick="triggerFile('apo')"><input type="file" id="file-apo" accept=".xlsx" style="display:none" onchange="onFileSelect('apo',this)"><div style="font-size:22px">📋</div><div class="file-drop-text" id="text-apo">クリックまたはドロップ</div><div style="font-size:10px;color:var(--text3)">.xlsx</div><button id="clear-apo" onclick="clearFile(event,'apo')" style="display:none;margin-top:4px;font-size:10px;padding:2px 8px;border:1px solid var(--red);border-radius:4px;color:var(--red);background:#fff;cursor:pointer">✕ 削除</button></div></div>
-          <div><div style="font-size:11px;font-weight:500;color:var(--text3);margin-bottom:6px">② 生産性レポート <span style="color:var(--red)">*必須</span></div>
-            <div class="file-drop" id="drop-prod" onclick="triggerFile('prod')"><input type="file" id="file-prod" accept=".csv" style="display:none" onchange="onFileSelect('prod',this)"><div style="font-size:22px">📊</div><div class="file-drop-text" id="text-prod">クリックまたはドロップ</div><div style="font-size:10px;color:var(--text3)">.csv</div><button id="clear-prod" onclick="clearFile(event,'prod')" style="display:none;margin-top:4px;font-size:10px;padding:2px 8px;border:1px solid var(--red);border-radius:4px;color:var(--red);background:#fff;cursor:pointer">✕ 削除</button></div></div>
-          <div><div style="font-size:11px;font-weight:500;color:var(--text3);margin-bottom:6px">③ 勤務データ <span style="color:var(--red)">*必須</span></div>
-            <div class="file-drop" id="drop-work" onclick="triggerFile('work')"><input type="file" id="file-work" accept=".csv,.zip" style="display:none" onchange="onFileSelect('work',this)"><div style="font-size:22px">⏱️</div><div class="file-drop-text" id="text-work">クリックまたはドロップ</div><div style="font-size:10px;color:var(--text3)">.csv / .zip</div><button id="clear-work" onclick="clearFile(event,'work')" style="display:none;margin-top:4px;font-size:10px;padding:2px 8px;border:1px solid var(--red);border-radius:4px;color:var(--red);background:#fff;cursor:pointer">✕ 削除</button></div></div>
-          <div><div style="font-size:11px;font-weight:500;color:var(--text3);margin-bottom:6px">④ スタッフマスター <span style="color:var(--text3)">任意（変更時のみ）</span></div>
-            <div class="file-drop" id="drop-master" onclick="triggerFile('master')"><input type="file" id="file-master" accept=".xlsx" style="display:none" onchange="onFileSelect('master',this)"><div style="font-size:22px">👥</div><div class="file-drop-text" id="text-master">クリックまたはドロップ</div><div style="font-size:10px;color:var(--text3)">.xlsx</div><button id="clear-master" onclick="clearFile(event,'master')" style="display:none;margin-top:4px;font-size:10px;padding:2px 8px;border:1px solid var(--red);border-radius:4px;color:var(--red);background:#fff;cursor:pointer">✕ 削除</button></div></div>
-          <div><div style="font-size:11px;font-weight:500;color:var(--text3);margin-bottom:6px">⑤ インセンティブ <span style="color:var(--text3)">任意・月1回</span></div>
-            <div class="file-drop" id="drop-inc" onclick="triggerFile('inc')"><input type="file" id="file-inc" accept=".xlsx" style="display:none" onchange="onFileSelect('inc',this)"><div style="font-size:22px">💰</div><div class="file-drop-text" id="text-inc">クリックまたはドロップ</div><div style="font-size:10px;color:var(--text3)">.xlsx（月1回）</div><button id="clear-inc" onclick="clearFile(event,'inc')" style="display:none;margin-top:4px;font-size:10px;padding:2px 8px;border:1px solid var(--red);border-radius:4px;color:var(--red);background:#fff;cursor:pointer">✕ 削除</button></div></div>
-        </div>
-        <div style="display:flex;align-items:center;gap:14px">
-          <button class="btn btn-primary" onclick="runUpdate()" id="btn-update" style="padding:9px 28px;font-size:13px">更新する</button>
-          <span id="update-status" style="font-size:12px;color:var(--text3)"></span>
-          <span id="server-status" style="font-size:11px;color:var(--text3);margin-left:8px"></span>
-        </div>
-        <!-- 進捗ステップ -->
-        <div id="update-steps" style="display:none;margin-top:14px">
-          <div style="display:flex;gap:0;align-items:center;flex-wrap:wrap;gap:4px">
-            <div class="step-item" id="step-1"><span class="step-num">1</span><span class="step-label">ファイル確認</span></div>
-            <div class="step-arrow">→</div>
-            <div class="step-item" id="step-2"><span class="step-num">2</span><span class="step-label">サーバー送信</span></div>
-            <div class="step-arrow">→</div>
-            <div class="step-item" id="step-3"><span class="step-num">3</span><span class="step-label">集計処理</span></div>
-            <div class="step-arrow">→</div>
-            <div class="step-item" id="step-4"><span class="step-num">4</span><span class="step-label">画面反映</span></div>
-            <div class="step-arrow">→</div>
-            <div class="step-item" id="step-5"><span class="step-num">5</span><span class="step-label">GitHub保存</span></div>
-          </div>
-        </div>
-        <div id="update-result" style="display:none;margin-top:12px"></div>
-      </div>
-    </div>
-
-    <!-- REVENUE -->
-    <div class="page" id="page-revenue">
-      <div class="card">
-        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
-          追加収益管理
-          <button class="btn btn-primary" onclick="openAddRevenue()">＋ 追加する</button>
-        </div>
-        <div style="font-size:11px;color:var(--text3);margin-bottom:14px">全体売上・原価率・着地見込みに反映されます。個人・ランク別実績には反映されません。</div>
-
-        <!-- 登録済み一覧 -->
-        <div id="revenue-list-wrap">
-          <table class="data-table" id="revenue-table">
-            <thead><tr><th>種別</th><th>クライアント名</th><th class="r">金額</th><th>操作</th></tr></thead>
-            <tbody id="revenue-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px">登録なし</td></tr></tbody>
-          </table>
-          <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-            <div style="font-size:13px;font-weight:500">合計：<span id="revenue-total" style="color:var(--orange)">¥0</span></div>
-            <button class="btn btn-primary" onclick="saveRevenue()" id="btn-save-revenue">保存して反映する</button>
-          </div>
-        </div>
-        <div id="revenue-save-result" style="display:none;margin-top:10px"></div>
-      </div>
-
-      <!-- 追加・編集モーダル -->
-      <div id="revenue-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center">
-        <div style="background:var(--white);border-radius:12px;padding:24px;width:400px;max-width:90vw">
-          <div style="font-size:14px;font-weight:500;margin-bottom:16px" id="rev-modal-title">追加収益を追加</div>
-          <div style="display:grid;gap:10px">
-            <div>
-              <div style="font-size:11px;color:var(--text3);margin-bottom:4px">種別</div>
-              <select id="rev-type" class="setting-input">
-                <option value="BPO通話料">BPO通話料</option>
-                <option value="DP">DP</option>
-                <option value="BPO固定費">BPO固定費</option>
-                <option value="コール課金">コール課金</option>
-                <option value="リスト・レポート作成費用">リスト・レポート作成費用</option>
-              </select>
-            </div>
-            <div>
-              <div style="font-size:11px;color:var(--text3);margin-bottom:4px">クライアント名</div>
-              <input type="text" id="rev-name" class="setting-input" placeholder="例）○○株式会社">
-            </div>
-            <div>
-              <div style="font-size:11px;color:var(--text3);margin-bottom:4px">金額（円）</div>
-              <input type="number" id="rev-amount" class="setting-input" placeholder="例）100000">
-            </div>
-          </div>
-          <input type="hidden" id="rev-edit-idx" value="-1">
-          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px">
-            <button class="btn btn-secondary" onclick="closeRevenueModal()">キャンセル</button>
-            <button class="btn btn-primary" onclick="confirmRevenue()">追加する</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- SETTINGS -->
-    <div class="page" id="page-settings">
-      <!-- 設定タブ -->
-      <div style="display:flex;gap:2px;background:#EDEDEB;border-radius:7px;padding:3px;margin-bottom:14px;width:fit-content">
-        <div class="site-tab active" id="stab-target" onclick="switchSettingTab('target',this)">目標設定</div>
-        <div class="site-tab" id="stab-staff" onclick="switchSettingTab('staff',this)">スタッフ管理</div>
-      </div>
-
-      <!-- 目標設定 -->
-      <div id="stab-panel-target">
-        <div class="card" style="margin-bottom:12px">
-          <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">目標設定<div style="display:flex;gap:8px"><button class="btn btn-secondary" onclick="cancelSettings()">キャンセル</button><button class="btn btn-primary" onclick="saveSettings()">保存する</button></div></div>
-          <table class="data-table">
-            <thead><tr><th>項目</th><th>全体</th><th>六本木SC</th><th>リモートSC</th><th>備考</th></tr></thead>
-            <tbody>
-              <tr><td>月次売上目標</td><td><input type="number" id="s-sales-all" class="setting-input" oninput="allocateSales()"></td><td><input type="number" id="s-sales-sj" class="setting-input"></td><td><input type="number" id="s-sales-rm" class="setting-input"></td><td style="font-size:11px;color:var(--text3)">円　全体入力で自動按分</td></tr>
-              <tr><td>原価率目標</td><td><input type="number" id="s-cost-all" class="setting-input"></td><td><input type="number" id="s-cost-sj" class="setting-input"></td><td><input type="number" id="s-cost-rm" class="setting-input"></td><td style="font-size:11px;color:var(--text3)">%</td></tr>
-              <tr><td>稼働単価目標</td><td><input type="number" id="s-unit-all" class="setting-input"></td><td><input type="number" id="s-unit-sj" class="setting-input"></td><td><input type="number" id="s-unit-rm" class="setting-input"></td><td style="font-size:11px;color:var(--text3)">円/日</td></tr>
-              <tr><td>当月営業日数</td><td><input type="number" id="s-days" class="setting-input"></td><td colspan="3" style="font-size:11px;color:var(--text3)">日（着地計算に使用）</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
-          <div style="font-size:12px;font-weight:500;margin-bottom:10px">GitHub連携（翌月準備）</div>
-          <div style="display:grid;gap:8px;margin-bottom:12px">
-            <div>
-              <div style="font-size:11px;color:var(--text3);margin-bottom:4px">GitHub Personal Access Token</div>
-              <input type="password" id="s-github-pat" class="setting-input" placeholder="ghp_xxxxxxxxxxxx" style="font-family:monospace">
-              <div style="font-size:10px;color:var(--text3);margin-top:3px">入力したトークンはこのブラウザのみに保存されます</div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <button class="btn btn-primary" onclick="prepareNextMonth()" id="btn-next-month" style="background:#2563EB">📅 翌月を準備する</button>
-            <span id="next-month-status" style="font-size:12px;color:var(--text3)"></span>
-          </div>
-          <div id="next-month-result" style="display:none;margin-top:10px"></div>
-        </div>
-      </div>
-
-      <!-- スタッフ管理 -->
-      <div id="stab-panel-staff" style="display:none">
-        <div class="card" style="margin-bottom:12px">
-          <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
-            スタッフ管理
-            <button class="btn btn-primary" onclick="openAddStaff()">＋ スタッフ追加</button>
-          </div>
-          <div style="margin-bottom:10px;display:flex;align-items:center;gap:8px">
-            <input type="text" id="staff-search" class="search-input" placeholder="氏名・IDで検索..." oninput="filterStaffTable()">
-            <span id="staff-count" style="font-size:11px;color:var(--text3)"></span>
-          </div>
-          <div style="overflow-x:auto">
-            <table class="data-table" id="staff-table">
-              <thead><tr>
-                <th>社員番号</th><th>氏名</th><th>サイト</th><th>ランク</th>
-                <th class="r">時給/月給</th><th>給与種別</th><th>状態</th><th>操作</th>
-              </tr></thead>
-              <tbody id="staff-tbody"><tr><td colspan="8" style="text-align:center;color:var(--text3);padding:20px">読み込み中...</td></tr></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- スタッフ追加・編集モーダル -->
-      <div id="staff-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center">
-        <div style="background:var(--white);border-radius:12px;padding:24px;width:440px;max-width:90vw">
-          <div style="font-size:14px;font-weight:500;margin-bottom:16px" id="modal-title">スタッフ追加</div>
-          <div style="display:grid;gap:10px">
-            <div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">社員番号</div><input type="text" id="m-empid" class="setting-input" placeholder="D0000001"></div>
-            <div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">氏名</div><input type="text" id="m-name" class="setting-input" placeholder="氏名を入力"></div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-              <div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">サイト</div>
-                <select id="m-site" class="setting-input">
-                  <option value="六本木SC">六本木SC</option>
-                  <option value="在宅G">リモートSC（在宅G）</option>
-                  
-                </select>
-              </div>
-              <div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">ランク</div>
-                <select id="m-rank" class="setting-input">
-                  <option value="トップ">トップ</option>
-                  <option value="ミドル">ミドル</option>
-                  <option value="ルーキープラス">ルーキープラス</option>
-                  <option value="ルーキー">ルーキー</option>
-                  <option value="管理者">管理者</option>
-                  <option value="社員">社員</option>
-                </select>
-              </div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-              <div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">時給 / 月給（円）</div><input type="number" id="m-rate" class="setting-input" placeholder="1500"></div>
-              <div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">給与種別</div>
-                <select id="m-stype" class="setting-input">
-                  <option value="hourly">時給</option>
-                  <option value="monthly">月給</option>
-                </select>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px">
-              <input type="checkbox" id="m-active" checked>
-              <label for="m-active" style="font-size:12px">在籍中（アクティブ）</label>
-            </div>
-          </div>
-          <input type="hidden" id="m-id">
-          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px">
-            <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
-            <button class="btn btn-primary" onclick="saveStaff()">保存する</button>
-          </div>
-          <div id="modal-error" style="display:none;margin-top:10px;font-size:11px;color:var(--red)"></div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-</div>
-</div>
-<script>
-var PT_DATA = null;
-
-// pt_data.jsonを外部ファイルから読み込む
-fetch('./pt_data.json')
-  .then(function(r){ return r.json(); })
-  .then(function(data) {
-    PT_DATA = data;
-    document.getElementById('updateTime').textContent = '最終更新: ' + PT_DATA.meta.lastUpdateLabel;
-    document.getElementById('alertText').textContent  = PT_DATA.meta.alertText;
-    // jinjer期間ズレ警告
-    _showWorkPeriodWarning(PT_DATA.meta.workPeriodWarning);
-    // 保存済み追加収益を復元
-    if (PT_DATA.additionalRevenues && PT_DATA.additionalRevenues.length > 0) {
-      additionalRevenues = PT_DATA.additionalRevenues;
-    }
-    renderDashboard('all');
-    renderDaily('all');
-    renderChart2();
-    initSettings();
-    // monthSelectをPT_DATAの現在月に合わせて動的生成
-    if (window._onPtDataReady) {
-      window._onPtDataReady.forEach(function(fn){ fn(); });
-    }
-    // Renderサーバーをバックグラウンドでウォームアップ（スリープ起動遅延を回避）
-    _warmupServer();
-  })
-  .catch(function(e){
-    console.error('データ読み込みエラー:', e);
-    document.getElementById('alertText').textContent = 'データ読み込みエラー: ' + e.message;
-  });
-
-
-var currentSite = 'all';
-var chartInst1 = null, chartInst2 = null;
-var SERVER_URL = 'https://digross-server.onrender.com';
-var selectedFiles = {};
-var ALLOC_RATIO = {shinjuku: 0.828, remote: 0.172};
-
-function fc(v) { return v != null && v !== '' ? '¥' + Math.round(v).toLocaleString() : '—'; }
-function fp(v) { return v != null ? v.toFixed(1) + '%' : '—'; }
-function costCls(v) { if (v == null) return ''; if (v <= 50) return 'c-pos'; if (v <= 75) return 'c-warn'; return 'c-neg'; }
-function rankCls(r) { var m={'トップ':'rb-top','ミドル':'rb-mid','ルーキープラス':'rb-rookie','ルーキー':'rb-rookie','管理者':'rb-mgr','社員':'rb-mgr'}; return m[r]||'rb-rookie'; }
-function siteKey(s){return{all:null,shinjuku:'六本木SC',remote:'リモートSC'}[s];}
-
-// Renderサーバーのウォームアップ（スリープ起動の遅延を回避）
-function _warmupServer() {
-  var el = document.getElementById('server-status');
-  if (el) { el.textContent = '○ サーバー確認中...'; el.style.color = 'var(--text3)'; }
-  fetch(SERVER_URL + '/health', {method: 'GET'})
-    .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
-    .then(function() {
-      if (el) { el.textContent = '● 準備完了'; el.style.color = 'var(--green)'; }
-    })
-    .catch(function() {
-      // 失敗しても無視（バックグラウンド処理）
-      // 50秒後に再試行
-      setTimeout(function() {
-        fetch(SERVER_URL + '/health').catch(function(){});
-        if (el) { el.textContent = '○ サーバー起動中（初回更新に時間がかかる場合があります）'; }
-      }, 50000);
-    });
-}
-
-function _showWorkPeriodWarning(msg) {
-  var el = document.getElementById('workPeriodWarning');
-  if (msg) {
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'workPeriodWarning';
-      el.style.cssText = 'margin:6px 0 0;padding:9px 14px;background:var(--red-light);border-left:3px solid var(--red);border-radius:6px;color:var(--red);font-size:12px;line-height:1.5;';
-      var alertEl = document.querySelector('.alert');
-      if (alertEl && alertEl.parentNode) alertEl.parentNode.insertBefore(el, alertEl.nextSibling);
-    }
-    el.textContent = '⚠️ ' + msg;
-    el.style.display = 'block';
-  } else {
-    if (el) el.style.display = 'none';
-  }
-}
-
-function showPage(id, el) {
-  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
-  document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.remove('active'); });
-  document.getElementById('page-' + id).classList.add('active');
-  if (el) el.classList.add('active');
-  var titles = {dashboard:'ダッシュボード',daily:'日次明細',operator:'OP個人実績',import:'データ取込',revenue:'追加収益',settings:'設定','op-full':'OP全体',export:'データ出力'};
-  document.getElementById('pageTitle').textContent = titles[id] || id;
-  var showTabs = ['dashboard','daily','operator'].indexOf(id) >= 0;
-  if (id === 'revenue') { renderRevenueList(); }
-  document.getElementById('siteTabs').style.display = showTabs ? 'flex' : 'none';
-  if (id === 'daily')    { renderDaily(currentSite); renderChart2(); }
-  if (id === 'operator') { renderOpSummary(currentSite); renderOpTable(currentSite); }
-  if (id === 'op-full')  { renderOpFull(currentSite); }
-}
-
-function switchSite(site, el) {
-  if (!PT_DATA) return;
-  currentSite = site;
-  document.querySelectorAll('.site-tab').forEach(function(t){ t.classList.remove('active'); });
-  if (el) el.classList.add('active');
-  renderDashboard(site);
-  renderDaily(site);
-  renderChart2();
-  renderOpSummary(site);
-  renderOpTable(site);
-}
-
-function renderDashboard(site) {
-  var d = PT_DATA.sites[site], t = PT_DATA.targets[site], m = PT_DATA.meta;
-  if (!d || !t) return;
-  var el = m.elapsedDays, wd = m.workingDays;
-
-  // サイト別在籍・アクティブ数
-  var siteLabel = {'all': null, 'shinjuku': siteKey('shinjuku'), 'remote': siteKey('remote'), 'ai': siteKey('ai')}[site];
-  var siteEnroll, siteActive;
-  if (site === 'all') {
-    siteEnroll = m.enrollCount || 0;
-    siteActive = m.activeCount || 0;
-  } else {
-    var eb = m.enrollBySite || {};
-    var ab = m.activeBySite || {};
-    siteEnroll = eb[siteLabel] || 0;
-    siteActive = ab[siteLabel] || 0;
-  }
-  var salesPct = t.sales > 0 ? d.sales / t.sales * 100 : 0;
-  var landing  = el > 0 ? Math.round(d.sales / el * wd) : 0;
-  var landPct  = t.sales > 0 ? landing / t.sales * 100 : 0;
-  var remain   = t.sales - d.sales;
-  var avgDaily = el > 0 ? Math.round(d.sales / el) : 0;
-  var tgtDaily = wd > 0 ? Math.round(t.sales / wd) : 0;
-  var diffDaily = avgDaily - tgtDaily;
-
-  document.getElementById('elapsed-label').textContent = el;
-
-  var kpiHtml =
-    kpiCard('c-orange','売上合計',fc(d.sales),
-      '<div class="prog-wrap"><div class="prog-bg"><div class="prog-fill" style="width:'+Math.min(salesPct,100).toFixed(1)+'%;background:var(--orange)"></div></div><span style="font-size:10px;color:var(--orange)">'+salesPct.toFixed(1)+'%</span></div>',
-      '目標 '+fc(t.sales)+'　進捗 '+salesPct.toFixed(1)+'%') +
-    kpiCard('c-orange','着地見込み',fc(landing),
-      '<span style="font-size:10px;font-weight:500;'+(landPct>=80?'color:var(--green)':landPct>=60?'color:var(--amber)':'color:var(--red)')+'">達成率 '+landPct.toFixed(1)+'%</span>',
-      '残 '+fc(remain)) +
-    kpiCard('c-red','原価率','<span class="'+costCls(d.costRate)+'">'+fp(d.costRate)+'</span>',
-      '<span style="font-size:10px;font-weight:500;'+(d.costRate<=t.costRate?'color:var(--green)':'color:var(--red)')+'">目標 '+fp(t.costRate)+'</span>',
-      '人件費 '+fc(d.labor)) +
-    kpiCard('c-green','粗利額','<span class="'+(d.gross>=0?'c-pos':'c-neg')+'">'+fc(d.gross)+'</span>',
-      '<span style="font-size:10px;color:var(--text3)">粗利率 '+(d.sales>0?(d.gross/d.sales*100).toFixed(1)+'%':'—')+'</span>','') +
-    kpiCard('c-gray','在籍 / アクティブ',
-      '<span style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted" onclick="openMemberModal(\'all\')">'+(siteEnroll||'—')+'名</span> / <span style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted" onclick="openMemberModal(\'active\')">'+(siteActive||'—')+'名</span>',
-      '<span style="font-size:10px;color:var(--text3)">稼働率 '+(siteEnroll>0?(siteActive/siteEnroll*100).toFixed(1)+'%':'—')+'</span>','');
-
-  document.getElementById('kpi-main').innerHTML = kpiHtml;
-
-  var subHtml =
-    subKpi('アポ数', d.apo + '件', '有効 ' + d.valid + '件') +
-    subKpi('キャンセル数', '<span class="'+(d.cancel>0?'c-neg':'')+'">'+ d.cancel + '件</span>', 'CXL率 ' + fp(d.cancelRate)) +
-    subKpi('コール数', (d.calls > 0 ? d.calls.toLocaleString() : '—') + '件', 'アポ率 ' + (d.apoRate > 0 ? d.apoRate.toFixed(2) + '%' : '—')) +
-    subKpi('日割り目標差', '<span class="'+(diffDaily >= 0 ? 'c-pos' : 'c-neg')+'">'+(diffDaily >= 0 ? '+' : '') + fc(diffDaily)+'</span>', '本日平均 ' + fc(avgDaily));
-  document.getElementById('sub-kpi').innerHTML = subHtml;
-
-  renderRankTable(site);
-  renderHeatmap();
-  renderChart1();
-}
-
-function kpiCard(cls, label, valHtml, badgeHtml, subText) {
-  return '<div class="kpi-card ' + cls + '"><div class="kpi-label">' + label + '</div><div class="kpi-value">' + valHtml + '</div>' + (badgeHtml || '') + (subText ? '<div class="kpi-sub">' + subText + '</div>' : '') + '</div>';
-}
-
-function subKpi(label, valHtml, sub) {
-  return '<div class="sub-kpi"><div class="sub-kpi-label">' + label + '</div><div class="sub-kpi-value">' + valHtml + '</div><div class="sub-kpi-sub">' + sub + '</div></div>';
-}
-
-function renderRankTable(site) {
-  var filter = siteKey(site);
-  var rankOrder = ['トップ','ミドル','ルーキープラス','ルーキー','管理者','社員'];
-  var displayRank = function(r) { return (r === 'ルーキープラス') ? 'ルーキー' : r; };
-  var byRank = {};
-  PT_DATA.operators.forEach(function(op) {
-    if (filter && op.site !== filter) return;
-    var r = op.rank || '—';
-    if (!byRank[r]) byRank[r] = {sales:0,labor:0,days:0,names:[],active:0};
-    byRank[r].sales += op.sales || 0;
-    byRank[r].labor += op.labor || 0;
-    byRank[r].days  += op.days  || 0;
-    byRank[r].names.push(op.name);
-    // 稼働判定：時給制はworkH>0、月給制はdays>0（workHがNullの場合）
-    if ((op.workH || 0) > 0 || (op.workH == null && (op.days || 0) > 0)) byRank[r].active++;
-  });
-  var masterRankCount = {};
-  PT_DATA.operators.forEach(function(op) {
-    if (filter && op.site !== filter) return;
-    var r = op.rank || '—';
-    if (!masterRankCount[r]) masterRankCount[r] = 0;
-    masterRankCount[r]++;
-  });
-
-  var mergedRanks = [];
-  rankOrder.forEach(function(rank) {
-    var g = byRank[rank];
-    if (!g) return;
-    var displayKey = displayRank(rank);
-    var existing = mergedRanks.find(function(x){ return x.display === displayKey; });
-    if (existing) {
-      existing.sales += g.sales; existing.labor += g.labor; existing.days += g.days;
-      existing.names = existing.names.concat(g.names); existing.active += g.active;
-    } else {
-      mergedRanks.push({display:displayKey,rank:rank,sales:g.sales,labor:g.labor,days:g.days,names:g.names,active:g.active});
-    }
-  });
-
-  var html = '';
-  mergedRanks.forEach(function(g) {
-    if (g.names.length === 0) return;
-    var cr  = g.sales > 0 ? (g.labor / g.sales * 100).toFixed(1) + '%' : '—';
-    var crCls = g.sales > 0 ? costCls(g.labor / g.sales * 100) : '';
-    var unit = g.days > 0 ? fc(Math.round(g.sales / g.days)) : '—';
-    html += '<tr style="cursor:pointer" onclick="openMemberModal(\'rank\',\'' + g.display + '\')" title="クリックでメンバー一覧を表示">' +
-      '<td><span class="rank-badge ' + rankCls(g.rank) + '">' + g.display + '</span></td>' +
-      '<td class="r">' + fc(g.sales) + '</td>' +
-      '<td class="r ' + crCls + '">' + cr + '</td>' +
-      '<td class="r">' + unit + '</td>' +
-      '<td class="r" style="text-decoration:underline;text-decoration-style:dotted">' + g.names.length + '名</td>' +
-      '<td class="r" style="text-decoration:underline;text-decoration-style:dotted">' + g.active + '名</td></tr>';
-  });
-  document.getElementById('rank-tbody').innerHTML = html;
-}
-
-// ===== メンバー一覧モーダル =====
-var _memberModalData = [];
-
-function openMemberModal(type, rankFilter) {
-  var VALID_RANKS = ['トップ','ミドル','ルーキープラス','ルーキー','管理者','社員'];
-  var isJuneOrLater = !siteKey('ai');
-  var ops = PT_DATA.operators.filter(function(op){
-    if (!op.rank || VALID_RANKS.indexOf(op.rank) < 0) return false;
-    if (isJuneOrLater && op.site === 'AI') return false;
-    return true;
-  });
-  _memberModalData = ops;
-
-  var title, sub;
-  if (type === 'active') {
-    _memberModalData = ops.filter(function(op){
-      return (op.workH||0)>0 || (op.workH==null&&(op.days||0)>0);
-    });
-    title = 'アクティブメンバー';
-    sub   = _memberModalData.length + '名が稼働中';
-  } else if (type === 'rank') {
-    var displayRank = rankFilter;
-    _memberModalData = ops.filter(function(op){
-      var d = op.rank === 'ルーキープラス' ? 'ルーキー' : op.rank;
-      return d === displayRank;
-    });
-    title = rankFilter + ' メンバー一覧';
-    sub   = _memberModalData.length + '名在籍';
-  } else {
-    title = '在籍メンバー一覧';
-    sub   = _memberModalData.length + '名在籍';
-  }
-
-  document.getElementById('member-modal-title').textContent = title;
-  document.getElementById('member-modal-sub').textContent   = sub;
-
-  // サイト別タブ（在籍・アクティブの場合）
-  var tabsEl = document.getElementById('member-site-tabs');
-  if (type !== 'rank') {
-    var sites = ['全体','新宿SC','六本木SC','リモートSC'];
-    tabsEl.innerHTML = sites.map(function(s) {
-      return '<button onclick="renderMemberList(\'' + s + '\')" style="padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg);font-size:11px;cursor:pointer" id="mtab-' + s + '">' + s + '</button>';
-    }).join('');
-    tabsEl.style.display = 'flex';
-    renderMemberList('全体');
-  } else {
-    tabsEl.style.display = 'none';
-    renderMemberList('全体');
-  }
-
-  document.getElementById('member-modal-overlay').style.display = 'flex';
-}
-
-function renderMemberList(site) {
-  // タブのアクティブ状態
-  document.querySelectorAll('[id^="mtab-"]').forEach(function(b){
-    b.style.background = b.id === 'mtab-' + site ? 'var(--orange)' : 'var(--bg)';
-    b.style.color = b.id === 'mtab-' + site ? '#fff' : 'var(--text)';
-    b.style.borderColor = b.id === 'mtab-' + site ? 'var(--orange)' : 'var(--border)';
-  });
-
-  var filtered = _memberModalData;
-  if (site !== '全体') {
-    filtered = _memberModalData.filter(function(op){ return op.site === site; });
-  }
-
-  var html = filtered.map(function(op, i) {
-    var rc = rankCls(op.rank);
-    var active = (op.workH||0)>0 || (op.workH==null&&(op.days||0)>0);
-    return '<tr>' +
-      '<td style="color:var(--text3);font-size:11px">' + (i+1) + '</td>' +
-      '<td style="font-weight:500">' + op.name + (active ? ' <span style="font-size:10px;color:var(--green)">●</span>' : '') + '</td>' +
-      '<td><span class="rank-badge ' + rc + '">' + (op.rank||'—') + '</span></td>' +
-      '<td style="color:var(--text2)">' + (op.site||'—') + '</td>' +
-      '<td class="r">' + (op.sales > 0 ? fc(op.sales) : '—') + '</td></tr>';
-  }).join('');
-  document.getElementById('member-modal-tbody').innerHTML = html ||
-    '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:20px">対象者なし</td></tr>';
-}
-
-function closeMemberModal(e) {
-  if (e && e.target !== document.getElementById('member-modal-overlay')) return;
-  document.getElementById('member-modal-overlay').style.display = 'none';
-}
-
-function renderHeatmap() {
-  // サイト別案件TOP20（heatmapデータから取得）
-  var hm = PT_DATA.heatmap;
-  var top20;
-  if (hm && typeof hm === 'object' && !Array.isArray(hm)) {
-    // サイト別heatmap（新形式）
-    top20 = (hm[currentSite] || hm['all'] || []).slice(0, 20);
-  } else {
-    // 旧形式（配列）後方互換
-    top20 = (hm || []).slice(0, 20);
-  }
-  var maxSales = top20.length > 0 ? top20[0].sales : 1;
-  var html = top20.map(function(h) {
-    var pct = Math.round(h.sales / maxSales * 100);
-    return '<div class="hm-row"><div class="hm-rank">' + h.rank + '</div>' +
-      '<div class="hm-name">' + h.name + '</div>' +
-      '<div class="hm-bar-bg"><div class="hm-bar-fill" style="width:' + pct + '%"></div></div>' +
-      '<div class="hm-val">' + fc(h.sales) + '</div></div>';
-  }).join('');
-  document.getElementById('heatmap-list').innerHTML = html ||
-    '<div style="color:var(--text3);font-size:12px;padding:12px">データなし</div>';
-}
-
-function renderChart1() {
-  var cd = PT_DATA.chart;
-  var siteData = (cd.bySite && cd.bySite[currentSite]) ? cd.bySite[currentSite] : cd.data;
-  var tgt = PT_DATA.targets[currentSite];
-  var wd  = PT_DATA.meta.workingDays;
-  var dailyTgt = tgt && tgt.sales > 0 && wd > 0 ? tgt.sales / wd / 10000 : null;
-  var bg = siteData.map(function(v){ return v > 0 ? '#D85A30' : 'rgba(216,90,48,0.15)'; });
-  var datasets = [{label:'売上',data:siteData,backgroundColor:bg,borderRadius:3,barPercentage:0.7}];
-  if (dailyTgt) {
-    datasets.push({type:'line',label:'日割り目標',data:cd.labels.map(function(){return dailyTgt;}),borderColor:'#E24B4A',borderWidth:1.5,borderDash:[4,4],pointRadius:0,fill:false});
-  }
-  var ctx = document.getElementById('dailyChart');
-  if (!ctx) return;
-  if (chartInst1) chartInst1.destroy();
-  chartInst1 = new Chart(ctx, {
-    type:'bar',data:{labels:cd.labels,datasets:datasets},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(d){return '¥'+(d.raw*10000).toLocaleString();}}}},
-      scales:{x:{ticks:{font:{size:9},color:'#888'},grid:{display:false},border:{display:false}},y:{ticks:{font:{size:9},color:'#888',callback:function(v){return'¥'+v.toFixed(0)+'万';}},grid:{color:'rgba(0,0,0,.04)'},border:{display:false}}}}
-  });
-}
-
-function renderChart2() {
-  var cd = PT_DATA.chart;
-  var siteData = (cd.bySite && cd.bySite[currentSite]) ? cd.bySite[currentSite] : cd.data;
-  var ctx = document.getElementById('dailyChart2');
-  if (!ctx) return;
-  if (chartInst2) chartInst2.destroy();
-  var bg = siteData.map(function(v){ return v > 0 ? '#D85A30' : 'rgba(216,90,48,0.15)'; });
-  chartInst2 = new Chart(ctx, {
-    type:'bar',data:{labels:cd.labels,datasets:[{label:'売上',data:siteData,backgroundColor:bg,borderRadius:3,barPercentage:0.7}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(d){return '¥'+(d.raw*10000).toLocaleString();}}}},
-      scales:{x:{ticks:{font:{size:9},color:'#888'},grid:{display:false},border:{display:false}},y:{ticks:{font:{size:9},color:'#888',callback:function(v){return'¥'+v.toFixed(0)+'万';}},grid:{color:'rgba(0,0,0,.04)'},border:{display:false}}}}
-  });
-}
-
-function renderDaily(site) {
-  var rows    = PT_DATA.daily[site] || PT_DATA.daily['all'];
-  var allRows = PT_DATA.daily['all'] || rows;
-  var totalLabor = (PT_DATA.sites[site] && PT_DATA.sites[site].labor)
-                   ? PT_DATA.sites[site].labor
-                   : (PT_DATA.sites.all.labor || 0);
-  var elapsed    = PT_DATA.meta.elapsedDays || rows.length;
-
-  var html = rows.map(function(r, i) {
-    var unit = r.valid > 0 ? fc(Math.round(r.sales / r.valid)) : '—';
-    var laborPerDay = r.daily_labor != null ? r.daily_labor :
-                      (elapsed > 0 ? Math.round(totalLabor / elapsed) : 0);
-    var costRate = (r.sales > 0 && laborPerDay > 0) ? (laborPerDay / r.sales * 100).toFixed(1) + '%' : '—';
-    var crCls = r.sales > 0 && laborPerDay > 0 ? costCls(laborPerDay / r.sales * 100) : '';
-    // 案件バー（daily.allのtop_projectsを参照）
-    var allRow = allRows[i] || {};
-    var projs  = allRow.top_projects || [];
-    var maxV   = allRow.max_valid || 1;
-    var projHtml = projs.length > 0
-      ? '<div style="display:flex;flex-direction:column;gap:3px;min-width:180px">' +
-        projs.map(function(p, idx) {
-          var barW = Math.round(p.valid / maxV * 56);
-          var op   = (1 - idx * 0.15).toFixed(2);
-          return '<div style="display:flex;align-items:center;gap:4px">' +
-            '<span style="font-size:9px;color:var(--text3);min-width:9px;text-align:right">' + (idx+1) + '</span>' +
-            '<div style="width:' + barW + 'px;height:4px;background:var(--orange);border-radius:2px;opacity:' + op + ';flex-shrink:0"></div>' +
-            '<span style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px">' + p.name + '</span>' +
-            '<span style="font-size:10px;color:var(--text3);flex-shrink:0">' + p.valid + '件</span>' +
-          '</div>';
-        }).join('') + '</div>'
-      : '<span style="color:var(--text3);font-size:11px">—</span>';
-    return '<tr style="cursor:pointer" onclick="openDailyModal(' + i + ')">' +
-      '<td style="color:var(--text3);font-size:11px">' + r.day + '</td><td>' + r.date + '</td>' +
-      '<td class="r">' + fc(r.sales) + '</td><td class="r">' + r.apo + '</td>' +
-      '<td class="r" style="color:var(--red)">' + r.cancel + '</td><td class="r">' + r.valid + '</td>' +
-      '<td class="r">' + r.ops + '</td><td class="r">' + (r.calls > 0 ? r.calls.toLocaleString() : '—') + '</td>' +
-      '<td class="r">' + unit + '</td>' +
-      '<td class="r">' + (laborPerDay > 0 ? fc(laborPerDay) : '—') + '</td>' +
-      '<td class="r ' + crCls + '">' + costRate + '</td>' +
-      '<td style="text-align:right"><span style="font-size:11px;color:var(--orange);white-space:nowrap">詳細 ▶</span></td></tr>';
-  }).join('');
-  var el = document.getElementById('daily-tbody');
-  if (el) el.innerHTML = html;
-  renderCostRateChart(rows, totalLabor, elapsed, PT_DATA.targets[site]);
-}
-
-function renderCostRateChart(rows, totalLabor, elapsed, target) {
-  var ctx = document.getElementById('costRateChart');
-  if (!ctx) return;
-  if (window.costRateChartInst) window.costRateChartInst.destroy();
-  var laborPerDay = elapsed > 0 ? totalLabor / elapsed : 0;
-  var labels = rows.map(function(r){ return r.date.replace(/\d{4}\//, ''); });
-  var data   = rows.map(function(r){
-    return r.sales > 0 && laborPerDay > 0 ? Math.round(laborPerDay / r.sales * 100) : null;
-  });
-  window.costRateChartInst = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: '原価率',
-          data: data,
-          borderColor: '#D85A30',
-          backgroundColor: 'rgba(216,90,48,0.08)',
-          borderWidth: 2,
-          pointRadius: 3,
-          fill: true,
-          tension: 0.3,
-          spanGaps: true
-        },
-        {
-          label: '目標原価率',
-          data: labels.map(function(){ return (target && target.costRate) ? target.costRate : (PT_DATA.targets.all.costRate || 50); }),
-          borderColor: '#E24B4A',
-          borderWidth: 1.5,
-          borderDash: [4,4],
-          pointRadius: 0,
-          fill: false
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+PT事業部 ダッシュボード更新サーバー v2
+========================================
+設計方針：
+  毎回アポイントリストから当月分を全て集計し直す（差分加算なし）
+  前回のpt_data.jsonからは「目標・設定値・チャートラベル」のみ参照
+
+エンドポイント：
+  POST /update  : 4ファイルを受け取り集計・pt_data.jsonを返す
+  GET  /health  : サーバー稼働確認用
+"""
+
+import io
+import json
+import os
+import re
+import traceback
+import zipfile
+from datetime import date, timedelta
+
+import pandas as pd
+import requests
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+from openpyxl import load_workbook
+from supabase import create_client, Client
+
+from flask_cors import CORS
+app = Flask(__name__)
+CORS(app)
+
+# ============================================================
+# 定数
+# ============================================================
+SITE_LABEL  = {'新宿SC': '新宿SC', '在宅G': 'リモートSC', 'AI': 'AI'}
+# 6月以降用：マスターのサイト列が「現場G」に変更済み（表示名は六本木SC）
+SITE_LABEL_JUNE = {'現場G': '六本木SC', '在宅G': 'リモートSC', 'AI': 'AI'}
+B_TO_D      = {'B0000106': 'D0000295', 'B0000107': 'D0000326', 'D0001318': 'B0000095'}
+KONO        = '幸野有希子CRM'   # 全体/サイト集計から除外
+EXCLUDE_OPS = ['堀川璃歩']      # 全集計から除外
+# 在籍カウント除外スタッフ（名前が空・ランクなし・退職者等）
+EXCLUDE_ENROLL = {'堀川璃歩', '堀川', ' 坂本杏奈1208', '藤公誉1212', '幸野有希子', '加藤隆治'}
+VALID_RANKS    = {'トップ', 'ミドル', 'ルーキープラス', 'ルーキー', '管理者', '社員'}
+
+# Supabaseクライアント
+SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
+SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')
+_supabase_client = None
+
+def get_supabase() -> Client:
+    global _supabase_client
+    if not _supabase_client and SUPABASE_URL and SUPABASE_KEY:
+        _supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    return _supabase_client
+
+# GitHubからスタッフマスターを自動読み込み
+MASTER_URL = 'https://raw.githubusercontent.com/DGLOSS-2009/dgross-server/main/%E3%82%B9%E3%82%BF%E3%83%83%E3%83%95%E3%83%9E%E3%82%B9%E3%82%BF%E3%83%BC.xlsx'
+_master_cache = None
+
+def get_master_from_github():
+    global _master_cache
+    try:
+        res = requests.get(MASTER_URL, timeout=30)
+        res.raise_for_status()
+        _master_cache = res.content
+        return res.content
+    except Exception as e:
+        if _master_cache:
+            return _master_cache
+        raise ValueError(f'スタッフマスターの取得に失敗しました: {e}')
+
+
+# ============================================================
+# ヘルスチェック
+# ============================================================
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'ok', 'message': 'PT事業部ダッシュボードサーバー稼働中'})
+
+
+# ============================================================
+# スタッフ管理エンドポイント
+# ============================================================
+@app.route('/staff', methods=['GET'])
+def get_staff():
+    try:
+        sb = get_supabase()
+        if not sb:
+            return jsonify({'error': 'Supabase未設定'}), 500
+        res = sb.table('staff').select('*').order('site').order('rank').order('name').execute()
+        return jsonify({'status': 'ok', 'data': res.data})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/staff', methods=['POST'])
+def add_staff():
+    try:
+        sb = get_supabase()
+        if not sb:
+            return jsonify({'error': 'Supabase未設定'}), 500
+        body = request.get_json()
+        res = sb.table('staff').insert(body).execute()
+        return jsonify({'status': 'ok', 'data': res.data})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/staff/<int:staff_id>', methods=['PUT'])
+def update_staff(staff_id):
+    try:
+        sb = get_supabase()
+        if not sb:
+            return jsonify({'error': 'Supabase未設定'}), 500
+        body = request.get_json()
+        res = sb.table('staff').update(body).eq('id', staff_id).execute()
+        return jsonify({'status': 'ok', 'data': res.data})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/staff/<int:staff_id>', methods=['DELETE'])
+def delete_staff(staff_id):
+    try:
+        sb = get_supabase()
+        if not sb:
+            return jsonify({'error': 'Supabase未設定'}), 500
+        res = sb.table('staff').delete().eq('id', staff_id).execute()
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# インセンティブ管理
+@app.route('/incentives/<month>', methods=['GET'])
+def get_incentives(month):
+    try:
+        sb = get_supabase()
+        if not sb:
+            return jsonify({'error': 'Supabase未設定'}), 500
+        res = sb.table('incentives').select('*').eq('month', month).execute()
+        return jsonify({'status': 'ok', 'data': res.data})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/incentives', methods=['POST'])
+def upsert_incentive():
+    try:
+        sb = get_supabase()
+        if not sb:
+            return jsonify({'error': 'Supabase未設定'}), 500
+        body = request.get_json()
+        res = sb.table('incentives').upsert(body, on_conflict='employee_id,month').execute()
+        return jsonify({'status': 'ok', 'data': res.data})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ============================================================
+# メイン更新エンドポイント
+# ============================================================
+@app.route('/update', methods=['POST'])
+def update():
+    try:
+        # --- ファイル受け取り ---
+        for key, label in [('apo','アポイントリスト'),('prod','生産性レポート'),
+                            ('work','勤務データ')]:
+            if key not in request.files:
+                return jsonify({'error': f'{label}が見つかりません'}), 400
+
+        apo_file  = request.files['apo'].read()
+        prod_file = request.files['prod'].read()
+        work_raw  = request.files['work'].read()
+        work_file, work_end_date = _extract_work_from_zip(work_raw)
+        prev_json = json.loads(request.files['prev'].read().decode('utf-8'))
+
+        # スタッフマスター：アップロード優先、なければGitHubから取得
+        master_file = (request.files['master'].read()
+                       if 'master' in request.files
+                       else get_master_from_github())
+
+        # インセンティブ（任意）
+        inc_map = prev_json.get('incentive', {})
+        if 'inc' in request.files:
+            inc_map = _load_incentive(request.files['inc'].read())
+
+        # --- マスター読み込み ---
+        df_master, df_wage = _load_master(master_file)
+        site_map      = dict(zip(df_master['スタッフ名'], df_master['サイト']))
+        rank_map      = dict(zip(df_master['スタッフ名'], df_master['ランク']))
+        id_map        = dict(zip(df_master['スタッフ名'], df_master['社員番号']))
+        master_ids    = set(df_master['社員番号'].tolist())
+        # 社員番号ベースのマッピング（集計の主キーとして使用）
+        id_site_map   = dict(zip(df_master['社員番号'], df_master['サイト']))
+        id_name_map   = dict(zip(df_master['社員番号'], df_master['スタッフ名']))
+
+        # --- アポイントリスト読み込み ---
+        df_apo = _load_apo(apo_file)
+
+        # --- 生産性レポート読み込み ---
+        df_prod = _load_csv(prod_file)
+
+        # --- 勤務データ読み込み ---
+        work_data = _load_work(work_file)
+        df_work   = work_data['df_monthly']   # 月累計（_calc_laborに渡す）
+        df_work_daily = work_data['df_daily'] # 日次（日次人件費計算用）None if monthly
+
+        # 汎用データの場合は最大日付を終了日として使用
+        if work_data['type'] == 'daily' and df_work_daily is not None and len(df_work_daily) > 0:
+            work_end_date = df_work_daily['年月日'].max()  # YYYY/MM/DD形式
+        # work_end_dateは_extract_work_from_zipで取得済み（月累計の場合）
+
+        # --- 設定値（前回pt_dataから引き継ぐもの）---
+        working  = prev_json['meta']['workingDays']   # 当月営業日数
+        targets  = prev_json['targets']               # 目標値
+        chart_labels = prev_json['chart']['labels']   # チャートラベル
+
+        # ============================================================
+        # 当月営業日の特定
+        # ============================================================
+        all_get_dates = sorted(df_apo['取得日'].dropna().unique())
+
+        month_str = prev_json['meta']['month']  # 例：2026年5月
+        m = re.search(r'(\d{4})年(\d+)月', month_str)
+        target_year  = int(m.group(1))
+        target_month = int(m.group(2))
+
+        biz_dates = sorted([
+            d for d in all_get_dates
+            if str(d).startswith(f'{target_year}/{str(target_month).zfill(2)}')
+        ])
+
+        if not biz_dates:
+            return jsonify({'error': '当月のアポイントデータが見つかりません'}), 400
+
+        elapsed = len(biz_dates)
+
+        # 前回のelapsedDaysより少ない場合は警告（アポリストが古い可能性）
+        prev_elapsed = prev_json.get('meta', {}).get('elapsedDays', 0)
+        if elapsed < prev_elapsed:
+            return jsonify({
+                'error': f'アポリストのデータが前回より少なくなっています（前回:{prev_elapsed}営業日 → 今回:{elapsed}営業日）。'
+                         f'最新のアポリスト（当月含む過去3ヶ月分）をアップしてください。'
+            }), 400
+
+        # 6月以降は新宿SC→六本木SCに表示変更
+        kono_excluded = target_month < 6
+        site_label = SITE_LABEL_JUNE if target_month >= 6 else SITE_LABEL
+
+        # ============================================================
+        # jinjer勤務データの期間検証
+        # ファイル名の終了日とアポリストの最終営業日を比較
+        # 差が2営業日以上あれば警告をmetaに記録
+        # ============================================================
+        work_period_warning = None
+        if work_end_date:
+            last_biz = biz_dates[-1]  # 例：2026/05/28
+            # 終了日を yyyy/mm/dd に正規化
+            work_end_norm = '/'.join(p.zfill(2) for p in work_end_date.split('/'))
+            if work_end_norm < last_biz:
+                work_period_warning = (
+                    f'jinjer勤務データの終了日（{work_end_date}）が'
+                    f'アポリストの最終営業日（{last_biz}）より前です。'
+                    f'月給制スタッフの人件費が過小計上になる可能性があります。'
+                    f'jinjerは当月1日〜最終更新日の期間で出力してください。'
+                )
+
+        # ============================================================
+        # 人件費計算（勤務データから）
+        # 【修正】days_by_id も返すよう変更
+        # ============================================================
+        site_labor, work_by_id, labor_by_id, days_by_id = _calc_labor(
+            df_work, df_master, df_wage, master_ids, working, site_label)
+
+        # ============================================================
+        # コール・稼働人数（生産性レポートから日次集計）
+        # 【修正】日付フォーマットを正規化して突合
+        # ============================================================
+        calls_by_date = {}
+        ops_by_date   = {}
+
+        # 生産性レポートの日付列を正規化
+        # 例：「2026/5/1」→「2026/05/01」、「2026-05-01」→「2026/05/01」
+        def normalize_date(s):
+            s = str(s).replace('-', '/').strip()
+            parts = s.split('/')
+            if len(parts) == 3:
+                return f"{parts[0]}/{parts[1].zfill(2)}/{parts[2].zfill(2)}"
+            return s
+
+        if '日付' in df_prod.columns:
+            df_prod['日付_norm'] = df_prod['日付'].apply(normalize_date)
+        else:
+            df_prod['日付_norm'] = ''
+
+        # エージェント列名を特定
+        agent_col = next((c for c in ['エージェント', 'エージェント名', 'Agent']
+                          if c in df_prod.columns), None)
+
+        for d in biz_dates:
+            mask = df_prod['日付_norm'] == d
+            calls_by_date[d] = int(df_prod[mask]['コール数'].sum()) if mask.any() else 0
+            ops_by_date[d]   = int(df_prod[mask][agent_col].nunique()) if (mask.any() and agent_col) else 0
+
+        # マスターのサイト列の生値（5月=新宿SC, 6月以降=現場G）
+        gemba_raw = '現場G' if target_month >= 6 else '新宿SC'
+
+        # ============================================================
+        # 日次明細
+        # ============================================================
+        daily = {'all': [], 'shinjuku': [], 'remote': [], 'ai': []}
+        for i, date_str in enumerate(biz_dates, 1):
+            d = _calc_daily(df_apo, date_str, site_map,
+                            calls_by_date, ops_by_date, i, kono_excluded, id_site_map, gemba_raw)
+            for key in ['all', 'shinjuku', 'remote', 'ai']:
+                daily[key].append(d[key])
+
+        # ============================================================
+        # サイト別累計
+        # ============================================================
+        # 表示名取得：6月以降は「現場G」キーから引く（マスター変更済み）
+        site_key_for_label = '現場G' if target_month >= 6 else '新宿SC'
+        shinjuku_label = site_label.get(site_key_for_label, '新宿SC')  # 5月=新宿SC, 6月=六本木SC
+        inc_site = {shinjuku_label: 0, 'リモートSC': 0, 'AI': 0}
+        for name, inc_total in inc_map.items():
+            if inc_total <= 0:
+                continue
+            site = site_label.get(site_map.get(name, ''), '')
+            if site in inc_site:
+                inc_site[site] += round(inc_total / working * elapsed)
+        inc_all = sum(inc_site.values())
+
+        # ============================================================
+        # unit計算用にoperatorsを事前に1回だけ計算（ループ内で毎回呼ぶとタイムアウト）
+        # ============================================================
+        _ops_for_unit = _calc_operators(
+            df_apo, biz_dates, df_master, df_prod,
+            work_by_id, labor_by_id, days_by_id, id_map, site_map, rank_map,
+            inc_map, elapsed, working, kono_excluded, site_label)
+
+        sites = {}
+        for k in ['all', 'shinjuku', 'remote', 'ai']:
+            site_jp = {'all': None, 'shinjuku': shinjuku_label,
+                       'remote': 'リモートSC', 'ai': 'AI'}[k]
+            last   = daily[k][-1] if daily[k] else {}
+            jinjer = {
+                'all':      sum(site_labor.values()),
+                'shinjuku': site_labor.get(shinjuku_label, 0),
+                'remote':   site_labor.get('リモートSC', 0),
+                'ai':       site_labor.get('AI', 0),
+            }[k]
+            labor = jinjer + (inc_all if k == 'all' else inc_site.get(site_jp, 0))
+
+            # OP個人実績の積み上げ
+            # 全体（all）は六本木SC・リモートSCのみ集計（AI・サイト未所属は除外）
+            valid_sites = {shinjuku_label, 'リモートSC'}
+            site_ops = [op for op in _ops_for_unit
+                        if k != 'all' and op['site'] == site_jp
+                        or k == 'all' and op['site'] in valid_sites]
+            sales  = sum(op['sales']  for op in site_ops)
+            apo    = sum(op['apo']    for op in site_ops)
+            cancel = sum(op['cancel'] for op in site_ops)
+            valid  = apo - cancel
+            # callsはsite_ops定義後に計算（前ループの値を使わないよう順序を保証）
+            calls  = sum(op.get('calls', 0) or 0 for op in site_ops) if k != 'all' else sum(op.get('calls', 0) or 0 for op in site_ops)
+            cr     = round(cancel / apo * 100, 1) if apo > 0 else 0
+            ar     = round(apo / calls * 100, 2)  if calls > 0 else 0
+            cost   = round(labor / sales * 100, 1) if sales > 0 else 0
+
+            ts = sum(o['sales'] for o in site_ops if o['sales'] > 0 and o.get('days', 0) > 0)
+            td = sum(o['days']  for o in site_ops if o['sales'] > 0 and o.get('days', 0) > 0)
+            unit = round(ts / td) if td > 0 else 0
+
+            sites[k] = {
+                'sales': sales, 'apo': apo, 'cancel': cancel, 'valid': valid,
+                'cancelRate': cr, 'labor': labor, 'costRate': cost,
+                'gross': sales - labor, 'ops': last.get('ops', 0),
+                'unit': unit, 'calls': calls, 'apoRate': ar,
+            }
+
+        # ============================================================
+        # チャートデータ
+        # ============================================================
+        chart_data = [0.0] * len(chart_labels)
+        for row in daily['all']:
+            d_label = row['date'].replace(f'{target_year}/', '').lstrip('0').replace('/0', '/')
+            if d_label in chart_labels:
+                idx = chart_labels.index(d_label)
+                chart_data[idx] = round(row['sales'] / 10000, 1)
+
+        # ============================================================
+        # ヒートマップ
+        # ============================================================
+        heatmap = _calc_heatmap(df_apo, biz_dates, sites['all']['sales'],
+                                kono_excluded, id_site_map, site_label, gemba_raw)
+
+        # operatorsは既にunit計算で使用した_ops_for_unitを流用（重複計算を避ける）
+        operators = _ops_for_unit
+
+        # ============================================================
+        # 日次×個人成果（日次明細モーダル用）
+        # ============================================================
+        kono_f = (df_apo['スタッフ名'] != KONO) if kono_excluded else pd.Series([True]*len(df_apo), index=df_apo.index)
+
+        # 【汎用データ対応】日次労働時間マップを構築
+        # df_work_daily が存在する場合（汎用データ）: 日次実労働時間ベース
+        # 存在しない場合（月累計）: 月次÷経過日数の均等割り
+        daily_labor_per_day_default = round(sites['all']['labor'] / elapsed) if elapsed > 0 else 0
+
+        # 時給マスター（日次人件費計算用）
+        wage_by_id_d  = dict(zip(df_wage['社員番号'], df_wage['時給'].astype(float)))
+        note_by_id_d  = dict(zip(df_wage['社員番号'], df_wage['備考']))
+        name_to_id    = dict(zip(df_master['スタッフ名'], df_master['社員番号']))
+
+        def _daily_labor_for_staff(name, date_str):
+            """スタッフの当日人件費を計算"""
+            if df_work_daily is None:
+                # 月累計均等割り
+                op = next((o for o in operators if o['name'] == name), None)
+                return round((op.get('labor',0) or 0) / elapsed) if op and elapsed > 0 else 0
+            # 汎用データから当日の実労働時間を取得
+            emp_id = name_to_id.get(name, '')
+            lookup = B_TO_D.get(emp_id, emp_id)
+            mask = (df_work_daily['従業員ID'] == lookup) | (df_work_daily['従業員ID'] == emp_id)
+            rows_d = df_work_daily[mask & (df_work_daily['年月日'] == date_str)]
+            h = float(rows_d['実労働h'].sum()) if len(rows_d) > 0 else 0.0
+            if h <= 0:
+                return 0
+            wage = wage_by_id_d.get(lookup) or wage_by_id_d.get(emp_id, 0)
+            note = str(note_by_id_d.get(lookup) or note_by_id_d.get(emp_id, ''))
+            if not wage:
+                return 0
+            if '月給' in note:
+                return round(float(wage) * 1.15 / working)
+            return round(float(wage) * h)
+
+        # 日次全体人件費（daily行に付与）
+        def _daily_total_labor(date_str):
+            if df_work_daily is None:
+                return daily_labor_per_day_default
+            mask = df_work_daily['年月日'] == date_str
+            rows_d = df_work_daily[mask]
+            total = 0
+            for _, wr in rows_d.iterrows():
+                emp_id = str(wr['従業員ID'])
+                lookup = B_TO_D.get(emp_id, emp_id)
+                h = float(wr['実労働h'])
+                if h <= 0: continue
+                wage = wage_by_id_d.get(lookup) or wage_by_id_d.get(emp_id, 0)
+                note = str(note_by_id_d.get(lookup) or note_by_id_d.get(emp_id, ''))
+                if not wage: continue
+                if '月給' in note:
+                    total += round(float(wage) * 1.15 / working)
+                else:
+                    total += round(float(wage) * h)
+            return total if total > 0 else daily_labor_per_day_default
+
+        def _daily_total_labor(date_str, site_raw_filter=None):
+            """当日の人件費合計。site_raw_filterでサイト絞り込み可能。"""
+            if df_work_daily is None:
+                # 均等割りフォールバック
+                if site_raw_filter is None:
+                    return daily_labor_per_day_default
+                site_labor_val = site_labor.get(site_label.get(site_raw_filter, ''), 0)
+                return round(site_labor_val / elapsed) if elapsed > 0 else 0
+            mask = df_work_daily['年月日'] == date_str
+            rows_d = df_work_daily[mask]
+            total = 0
+            for _, wr in rows_d.iterrows():
+                emp_id = str(wr['従業員ID'])
+                lookup = B_TO_D.get(emp_id, emp_id)
+                h = float(wr['実労働h'])
+                if h <= 0: continue
+                # サイトフィルタ
+                if site_raw_filter is not None:
+                    staff_site = id_site_map.get(lookup) or id_site_map.get(emp_id, '')
+                    if staff_site != site_raw_filter:
+                        continue
+                wage = wage_by_id_d.get(lookup) or wage_by_id_d.get(emp_id, 0)
+                note = str(note_by_id_d.get(lookup) or note_by_id_d.get(emp_id, ''))
+                if not wage: continue
+                if '月給' in note:
+                    total += round(float(wage) * 1.15 / working)
+                else:
+                    total += round(float(wage) * h)
+            if total <= 0:
+                if site_raw_filter is None:
+                    return daily_labor_per_day_default
+                site_labor_val = site_labor.get(site_label.get(site_raw_filter, ''), 0)
+                return round(site_labor_val / elapsed) if elapsed > 0 else 0
+            return total
+
+        # daily各サイトの各行にdaily_laborを付与（マスター生値は月で切替：5月=新宿SC, 6月以降=現場G）
+        site_raw_map = {'all': None, 'shinjuku': gemba_raw, 'remote': '在宅G', 'ai': 'AI'}
+        for site_key_d, raw in site_raw_map.items():
+            for row in daily[site_key_d]:
+                row['daily_labor'] = _daily_total_labor(row['date'], raw)
+
+        daily_ops_by_date = {}
+        for date_str in biz_dates:
+            df_d_get = df_apo[(df_apo['取得日'] == date_str) & kono_f].copy()
+            df_d_cxl = df_apo[(df_apo['cancel_date_str'] == date_str) & kono_f].copy()
+
+            g_apo = df_d_get.groupby('スタッフ名').agg(
+                apo=('アポイントID','count'), sg=('sales','sum')).reset_index()
+            g_cxl = df_d_cxl.groupby('スタッフ名').agg(
+                cxl=('アポイントID','count'), sc=('sales','sum')).reset_index()
+            g = g_apo.merge(g_cxl, on='スタッフ名', how='outer').fillna(0)
+            g['valid'] = (g['apo'] - g['cxl']).astype(int)
+            g['net']   = (g['sg']  - g['sc']).astype(int)
+
+            proj_by_staff = df_d_get.groupby(['スタッフ名','登録案件名']).agg(
+                p_apo=('アポイントID','count'), p_sales=('sales','sum')).reset_index()
+            proj_cxl_by_staff = df_d_cxl.groupby(['スタッフ名','登録案件名']).agg(
+                p_cxl=('アポイントID','count'), p_sc=('sales','sum')).reset_index()
+            proj_m = proj_by_staff.merge(proj_cxl_by_staff, on=['スタッフ名','登録案件名'], how='left').fillna(0)
+            proj_m['p_valid'] = (proj_m['p_apo'] - proj_m['p_cxl']).astype(int)
+
+            staff_list = []
+            for _, row in g.iterrows():
+                name    = str(row['スタッフ名'])
+                net     = int(row['net'])
+                labor_d = _daily_labor_for_staff(name, date_str)
+                cost_r  = round(labor_d / net * 100, 1) if net > 0 and labor_d > 0 else None
+                projs   = proj_m[proj_m['スタッフ名'] == name].copy()
+                proj_list = [
+                    {'name': str(r['登録案件名']), 'valid': int(r['p_valid']),
+                     'sales': int(r['p_sales'] - r['p_sc'])}
+                    for _, r in projs.iterrows() if int(r['p_valid']) > 0
+                ]
+                proj_list.sort(key=lambda x: -x['valid'])
+                staff_list.append({
+                    'name': name, 'sales': net, 'valid': int(row['valid']),
+                    'costRate': cost_r, 'projects': proj_list
+                })
+
+            staff_list.sort(key=lambda x: (-x['sales'], -x['valid']))
+            daily_ops_by_date[date_str] = staff_list
+
+        # daily['all']の各行にdaily_opsを付与
+        for row in daily['all']:
+            row['daily_ops'] = daily_ops_by_date.get(row['date'], [])
+
+        # ============================================================
+        # 【修正】enrollCount・activeCount を計算
+        # ============================================================
+        # ============================================================
+        # enrollCount・activeCount を計算
+        # 在籍 = マスターに存在する有効スタッフ（除外対象・ランクなし除く）
+        # アクティブ = 在籍スタッフ かつ 当月生産性レポートに名前がある
+        # ============================================================
+        master_names = set(df_master['スタッフ名'].tolist())
+        ai_excluded = not kono_excluded
+
+        # サイト別在籍・アクティブ集計
+        site_labels_list = [shinjuku_label, 'リモートSC', 'AI']
+        enroll_by_site = {s: 0 for s in site_labels_list}
+        active_by_site = {s: 0 for s in site_labels_list}
+
+        enroll_ops = []
+        for op in operators:
+            if op['name'].strip() in EXCLUDE_ENROLL: continue
+            if op['rank'] not in VALID_RANKS: continue
+            if op['name'] not in master_names: continue
+            if ai_excluded and op.get('site') == 'AI': continue
+            enroll_ops.append(op)
+            s = op.get('site', '')
+            if s in enroll_by_site:
+                enroll_by_site[s] += 1
+
+        enroll_count = len(enroll_ops)
+
+        if agent_col:
+            prod_names = set(df_prod[agent_col].astype(str).str.strip().tolist())
+        else:
+            prod_names = set()
+
+        active_count = 0
+        for op in enroll_ops:
+            is_active = op['name'] in prod_names
+            if is_active:
+                active_count += 1
+                s = op.get('site', '')
+                if s in active_by_site:
+                    active_by_site[s] += 1
+
+        # サイト別chart dataを生成
+        chart_by_site = {}
+        for k in ['all', 'shinjuku', 'remote', 'ai']:
+            site_jp = {'all': None, 'shinjuku': shinjuku_label, 'remote': 'リモートSC', 'ai': 'AI'}[k]
+            c_data = [0.0] * len(chart_labels)
+            for row in daily[k]:
+                d_label = row['date'].replace(f'{target_year}/', '').replace('/0', '/').lstrip('0')
+                if d_label in chart_labels:
+                    idx = chart_labels.index(d_label)
+                    c_data[idx] = round(row['sales'] / 10000, 1)
+            chart_by_site[k] = c_data
+
+        # ============================================================
+        # PT_DATA組み立て
+        # ============================================================
+        today = date.today().strftime('%Y/%m/%d')
+        last_date = biz_dates[-1].replace(f'{target_year}/', '')
+        month_label = f'{target_year}年{target_month}月'
+
+        PT_DATA = {
+            'meta': {
+                'month':           month_label,
+                'lastUpdate':      today,
+                'lastUpdateLabel': f"{date.today().strftime('%m/%d')}（{last_date}分反映済）",
+                'elapsedDays':     elapsed,
+                'workingDays':     working,
+                'alertText':       f"{last_date}のデータを反映済みです（累計{elapsed}営業日）。最終更新: {today}",
+                'enrollCount':     enroll_count,
+                'activeCount':     active_count,
+                'enrollBySite':    enroll_by_site,   # サイト別在籍数
+                'activeBySite':    active_by_site,   # サイト別アクティブ数
+                'workPeriodWarning': work_period_warning,
+            },
+            'targets':   targets,
+            'sites':     sites,
+            'daily':     daily,
+            'chart':     {
+                'labels': chart_labels,
+                'data':   chart_data,          # 全体（後方互換）
+                'bySite': chart_by_site,       # サイト別
+            },
+            'heatmap':   heatmap,
+            'operators': operators,
+            'incentive': inc_map,
+            'prev_calls': {op['name']: op['calls'] for op in operators},
         }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {display: true, position: 'top', labels: {font:{size:10}, boxWidth:12}},
-        tooltip: {callbacks: {label: function(d){ return d.dataset.label + ': ' + (d.raw != null ? d.raw + '%' : '—'); }}}
-      },
-      scales: {
-        x: {ticks:{font:{size:9},color:'#888'},grid:{display:false},border:{display:false}},
-        y: {
-          ticks:{font:{size:9},color:'#888',callback:function(v){return v+'%';}},
-          grid:{color:'rgba(0,0,0,.04)'},
-          border:{display:false},
-          min: 0
+
+        # 検証
+        j = json.dumps(PT_DATA, ensure_ascii=False)
+        assert 'NaN'      not in j, 'NaN混入'
+        assert 'Infinity' not in j, 'Infinity混入'
+
+        return jsonify({'status': 'ok', 'data': PT_DATA})
+
+    except Exception as e:
+        return jsonify({'error': str(e), 'detail': traceback.format_exc()}), 500
+
+
+# ============================================================
+# ヘルパー関数
+# ============================================================
+def _extract_work_from_zip(file_bytes):
+    """
+    zip圧縮の勤務データを展開してcsvバイトを返す。
+    【追加】ファイル名から期間（終了日）を抽出して返す。
+    戻り値: (csv_bytes, end_date_str or None)
+    """
+    try:
+        with zipfile.ZipFile(io.BytesIO(file_bytes)) as zf:
+            csv_files = [n for n in zf.namelist() if n.lower().endswith('.csv')]
+            if not csv_files:
+                raise ValueError('zip内にcsvファイルが見つかりません')
+            target = max(csv_files, key=lambda n: zf.getinfo(n).file_size)
+            # ファイル名から終了日を抽出
+            # 例：勤務データ_打刻グループ_2026_05_01_2026_05_28.csv
+            import re
+            try:
+                fname = target.encode('cp437').decode('cp932')
+            except:
+                fname = target
+            end_date = None
+            m = re.search(r'\d{4}_\d{2}_\d{2}_(\d{4}_\d{2}_\d{2})', fname)
+            if m:
+                end_date = m.group(1).replace('_', '/')
+            return zf.read(target), end_date
+    except zipfile.BadZipFile:
+        return file_bytes, None
+
+
+def _load_master(file_bytes):
+    wb = load_workbook(io.BytesIO(file_bytes), read_only=True)
+    ws_m = wb['スタッフマスター']
+    rows_m = list(ws_m.iter_rows(values_only=True))[1:]
+    df_m = pd.DataFrame(rows_m, columns=['社員番号', 'スタッフ名', 'サイト', 'ランク'])
+    df_m = df_m.dropna(subset=['社員番号']).fillna('')
+    df_m['社員番号'] = df_m['社員番号'].astype(str).str.strip()
+
+    ws_w = wb['時給マスター']
+    rows_w = list(ws_w.iter_rows(values_only=True))[1:]
+    # 列数に応じて柔軟に対応（4列または5列）
+    header_w = list(wb['時給マスター'].iter_rows(values_only=True))[0]
+    col_count = sum(1 for c in header_w if c is not None)
+    if col_count >= 4:
+        # 先頭4列のみ使用（末尾の空列は無視）
+        rows_w_trimmed = [r[:4] for r in rows_w]
+        df_w = pd.DataFrame(rows_w_trimmed, columns=['社員番号', 'スタッフ名', '時給', '備考'])
+    else:
+        df_w = pd.DataFrame(rows_w, columns=['社員番号', 'スタッフ名', '時給', '備考'])
+    df_w = df_w.dropna(subset=['社員番号']).fillna('')
+    df_w['社員番号'] = df_w['社員番号'].astype(str).str.strip()
+    df_w['時給'] = pd.to_numeric(df_w['時給'], errors='coerce').fillna(0).astype(int)
+    return df_m, df_w
+
+
+def _load_apo(file_bytes):
+    wb = load_workbook(io.BytesIO(file_bytes), read_only=True)
+    ws = wb['Sheet1']
+    rows = list(ws.iter_rows(values_only=True))
+    df = pd.DataFrame(rows[1:], columns=rows[0])
+    df = df[~df['スタッフ名'].isin(EXCLUDE_OPS)].copy()
+    df['スタッフ名'] = df['スタッフ名'].replace('君塚綾子', '君塚綾子1104')
+    # 名称表記ゆれ正規化（スタッフ名ベースの突合精度向上のため）
+    df['スタッフ名'] = df['スタッフ名'].replace('幸野有希子', '幸野有希子CRM')
+    # 社員番号列の正規化（D/B/A + 7桁数字）
+    df['社員番号'] = df['社員番号'].astype(str).str.strip()
+    df['cancel_date_str'] = df['キャンセル受付日'].astype(str).str.strip()
+    df['sales'] = pd.to_numeric(df['案件金額'], errors='coerce').fillna(0)
+    return df
+
+
+def _load_csv(file_bytes):
+    for enc in ['utf-8-sig', 'cp932']:
+        try:
+            return pd.read_csv(io.BytesIO(file_bytes), encoding=enc)
+        except Exception:
+            continue
+    raise ValueError('CSVの読み込みに失敗しました')
+
+
+def _parse_hhmm(t):
+    """HH:MM形式の時間文字列をfloat（時間）に変換"""
+    if pd.isna(t): return 0.0
+    t = str(t).strip()
+    if ':' not in t: return 0.0
+    parts = t.split(':')
+    try:
+        h = int(parts[0])
+        m = int(parts[1]) if len(parts) > 1 else 0
+        return h + m / 60.0
+    except:
+        return 0.0
+
+
+def _load_work(file_bytes):
+    """
+    jinjer勤務データの読み込み。汎用データ（日次）・月累計の両形式に対応。
+
+    【汎用データの判定条件】
+    列に「*年月日」「実労働時間」が存在する場合 → 汎用データ（日次×スタッフ）
+    それ以外 → 従来の月累計データ
+
+    【戻り値】
+    {
+      'type': 'daily' | 'monthly',
+      'df_daily': DataFrame（日次×スタッフ：従業員ID, 年月日, 実労働h）または None,
+      'df_monthly': DataFrame（スタッフ別月累計：従業員ID, 総労働時間, 出勤日数）
+    }
+    """
+    for enc in ['cp932', 'utf-8-sig', 'utf-8']:
+        try:
+            df = pd.read_csv(io.BytesIO(file_bytes), encoding=enc)
+            break
+        except Exception:
+            continue
+    else:
+        raise ValueError('勤務データの読み込みに失敗しました')
+
+    # 汎用データ判定
+    is_hanyo = ('*年月日' in df.columns and '実労働時間' in df.columns and '*従業員ID' in df.columns)
+
+    if is_hanyo:
+        # --- 汎用データ（日次）---
+        df = df.dropna(subset=['*従業員ID'])
+        df['*従業員ID'] = df['*従業員ID'].astype(str).str.strip()
+        df['年月日'] = pd.to_datetime(df['*年月日'], errors='coerce')
+        df['年月日str'] = df['年月日'].dt.strftime('%Y/%m/%d')
+        df['実労働h'] = df['実労働時間'].apply(_parse_hhmm)
+
+        # 日次データ（従業員ID × 日付 × 実労働h）
+        df_daily = df[['*従業員ID', '年月日str', '実労働h']].copy()
+        df_daily.columns = ['従業員ID', '年月日', '実労働h']
+        df_daily = df_daily[df_daily['実労働h'] > 0].reset_index(drop=True)
+
+        # 月累計集約（_calc_laborへの互換）
+        monthly = df.groupby('*従業員ID').agg(
+            総労働時間=('実労働h', 'sum'),
+            出勤日数=('実労働h', lambda x: (x > 0).sum())
+        ).reset_index().rename(columns={'*従業員ID': '従業員ID'})
+
+        return {'type': 'daily', 'df_daily': df_daily, 'df_monthly': monthly}
+
+    else:
+        # --- 従来の月累計データ ---
+        df = df.dropna(subset=['従業員ID'])
+        df['総労働時間'] = pd.to_numeric(df['総労働時間'], errors='coerce').fillna(0)
+        df['出勤日数']   = pd.to_numeric(df['出勤日数'],   errors='coerce').fillna(0)
+        monthly = df.sort_values('総労働時間', ascending=False).drop_duplicates(subset='従業員ID')
+        return {'type': 'monthly', 'df_daily': None, 'df_monthly': monthly}
+
+
+def _load_incentive(file_bytes):
+    wb = load_workbook(io.BytesIO(file_bytes), read_only=True)
+    ws = wb.active
+    result = {}
+    for row in list(ws.iter_rows(values_only=True))[1:]:
+        if len(row) >= 3 and row[2]:
+            name   = str(row[1]).strip() if row[1] else ''
+            amount = int(pd.to_numeric(row[2], errors='coerce') or 0)
+            if name and amount > 0:
+                result[name] = amount
+    return result
+
+
+def _calc_labor(df_work, df_master, df_wage, master_ids, working, site_label=None):
+    """人件費計算"""
+    if site_label is None:
+        site_label = SITE_LABEL
+    site_map_id = dict(zip(df_master['社員番号'], df_master['サイト']))
+    wage_by_id  = dict(zip(df_wage['社員番号'], df_wage['時給']))
+    note_by_id  = dict(zip(df_wage['社員番号'], df_wage['備考']))
+
+    # 【修正】月給制は出勤日数>0のみで稼働判定、時給制は従来通り
+    # まず全行をループして月給/時給で条件分岐
+    # site_labelの値（表示名）から「六本木SC/新宿SC」を取得（キーがどちらでも対応）
+    shinjuku_key = next((v for v in site_label.values() if v in ('新宿SC', '六本木SC')), '新宿SC')
+    site_labor  = {shinjuku_key: 0, 'リモートSC': 0, 'AI': 0}
+    work_by_id  = {}
+    labor_by_id = {}
+    days_by_id  = {}
+
+    for _, row in df_work.iterrows():
+        emp_id = str(row['従業員ID']).strip()
+        hours  = float(row['総労働時間'])
+        days   = float(row['出勤日数'])
+        lookup = B_TO_D.get(emp_id, emp_id)
+        if lookup not in master_ids and emp_id not in master_ids:
+            continue
+        site_r = site_map_id.get(lookup) or site_map_id.get(emp_id, '')
+        site_d = site_label.get(site_r, 'その他')
+        wage   = wage_by_id.get(lookup) or wage_by_id.get(emp_id)
+        note   = str(note_by_id.get(lookup) or note_by_id.get(emp_id, ''))
+        if not wage:
+            continue
+        wage = float(wage)
+        is_monthly = '月給' in note
+
+        # 【修正】稼働判定：月給制は出勤日数>0、時給制は労働時間>0
+        if is_monthly:
+            if days <= 0:
+                continue
+            cost = round(wage * 1.15 / working * days)
+        else:
+            if hours <= 0:
+                continue
+            cost = round(wage * hours)
+
+        site_labor[site_d] = site_labor.get(site_d, 0) + cost
+        work_by_id[lookup]  = work_by_id[emp_id]  = hours
+        labor_by_id[lookup] = labor_by_id[emp_id] = cost
+        days_by_id[lookup]  = days_by_id[emp_id]  = days  # 【追加】出勤日数を保存
+
+    return site_labor, work_by_id, labor_by_id, days_by_id  # 【修正】days_by_idを追加
+
+
+def _calc_daily(df_apo, date_str, site_map, calls_by_date, ops_by_date, day_num,
+                kono_excluded=True, id_site_map=None, gemba_raw='新宿SC'):
+    """1営業日分の集計。社員番号ベースでサイトを判定。"""
+    kono_filter = (df_apo['スタッフ名'] != KONO) if kono_excluded else pd.Series([True]*len(df_apo), index=df_apo.index)
+    df_g = df_apo[
+        (df_apo['取得日'] == date_str) &
+        kono_filter
+    ].copy()
+
+    df_c = df_apo[
+        (df_apo['cancel_date_str'] == date_str) &
+        kono_filter
+    ].copy()
+
+    # サイト判定：社員番号ベース（id_site_mapあり）、なければスタッフ名ベース
+    if id_site_map:
+        df_g['site_raw'] = df_g['社員番号'].map(id_site_map).fillna(
+            df_g['スタッフ名'].map(site_map))
+        df_c['site_raw'] = df_c['社員番号'].map(id_site_map).fillna(
+            df_c['スタッフ名'].map(site_map))
+    else:
+        df_g['site_raw'] = df_g['スタッフ名'].map(site_map)
+        df_c['site_raw'] = df_c['スタッフ名'].map(site_map)
+
+    # 当日の案件別集計（全体・TOP5）
+    pg = df_g.groupby('登録案件名').agg(apo=('アポイントID','count'), sg=('sales','sum')).reset_index()
+    pc = df_c.groupby('登録案件名').agg(cxl=('アポイントID','count'), sc=('sales','sum')).reset_index()
+    proj = pg.merge(pc, on='登録案件名', how='left').fillna(0)
+    proj['valid'] = (proj['apo'] - proj['cxl']).astype(int)
+    proj['net']   = (proj['sg']  - proj['sc']).astype(int)
+    proj = proj[proj['valid'] > 0].sort_values('valid', ascending=False).head(5)
+    top_projects = [
+        {'name': str(r['登録案件名']), 'valid': int(r['valid']), 'sales': int(r['net'])}
+        for _, r in proj.iterrows()
+    ]
+    max_valid = top_projects[0]['valid'] if top_projects else 1
+
+    result = {}
+    for key, raw in [('all', None), ('shinjuku', gemba_raw),
+                     ('remote', '在宅G'), ('ai', 'AI')]:
+        # スタッフのサイト（マスターベース）でフィルタ
+        g = df_g if raw is None else df_g[df_g['site_raw'] == raw]
+        c = df_c if raw is None else df_c[df_c['site_raw'] == raw]
+        row = {
+            'day':    f'{day_num}営業日',
+            'date':   date_str,
+            'sales':  int(g['sales'].sum()) - int(c['sales'].sum()),
+            'apo':    len(g),
+            'cancel': len(c),
+            'valid':  len(g) - len(c),
+            'ops':    ops_by_date.get(date_str, 0),
+            'calls':  calls_by_date.get(date_str, 0) if key == 'all' else 0,
         }
-      }
-    }
-  });
-}
+        # 案件内訳はallのみ付与
+        if key == 'all':
+            row['top_projects'] = top_projects
+            row['max_valid']    = max_valid
+        result[key] = row
+    return result
 
-function renderOpSummary(site) {
-  var filter = siteKey(site);
-  var rankOrder = ['トップ','ミドル','ルーキープラス','ルーキー','管理者','社員'];
-  var byRank = {};
-  PT_DATA.operators.forEach(function(op) {
-    if (filter && op.site !== filter) return;
-    var r = op.rank || '—';
-    if (!byRank[r]) byRank[r] = {sales:0,labor:0,days:0,members:[]};
-    byRank[r].sales += op.sales || 0;
-    byRank[r].labor += op.labor || 0;
-    byRank[r].days  += op.days  || 0;
-    byRank[r].members.push(op.name);
-  });
-  var mergedRanks = [];
-  rankOrder.forEach(function(rank) {
-    var g = byRank[rank]; if (!g) return;
-    var dk = rank === 'ルーキープラス' ? 'ルーキー' : rank;
-    var ex = mergedRanks.find(function(x){return x.display===dk;});
-    if (ex) { ex.sales+=g.sales;ex.labor+=g.labor;ex.days+=g.days;ex.members=ex.members.concat(g.members); }
-    else mergedRanks.push({display:dk,rank:rank,sales:g.sales,labor:g.labor,days:g.days,members:g.members});
-  });
-  var html = mergedRanks.filter(function(g){return g.members.length>0;}).map(function(g) {
-    var cr = g.sales>0?(g.labor/g.sales*100).toFixed(1)+'%':'—';
-    var unit = g.days>0?fc(Math.round(g.sales/g.days)):'—';
-    return '<div class="card"><div class="card-title" style="margin-bottom:8px"><span class="rank-badge '+rankCls(g.rank)+'">'+g.display+'</span> '+g.members.length+'名</div>'+
-      '<div style="font-size:14px;font-weight:500">'+fc(g.sales)+'</div>'+
-      '<div style="font-size:11px;color:var(--text3);margin-top:4px">原価率 <span class="'+costCls(g.sales>0?g.labor/g.sales*100:null)+'">'+cr+'</span>　単価/日 '+unit+'</div></div>';
-  }).join('');
-  var el = document.getElementById('op-summary');
-  if (el) el.innerHTML = html;
-}
 
-// ソート・フィルター状態
-var opSortCol = 'sales', opSortDir = 'desc';
-var opFilterCol = null, opFilterMin = null, opFilterMax = null;
-var shMenuCol = null;
+def _calc_heatmap(df_apo, biz_dates, total_sales, kono_excluded=True,
+                  site_map=None, site_label=None, gemba_raw='新宿SC'):
+    """案件別売上TOP10。サイト別も生成する。"""
+    kono_filter = (df_apo['スタッフ名'] != KONO) if kono_excluded else pd.Series([True]*len(df_apo), index=df_apo.index)
+    df_g = df_apo[df_apo['取得日'].isin(biz_dates) & kono_filter].copy()
+    df_c = df_apo[df_apo['cancel_date_str'].isin(biz_dates) & kono_filter].copy()
 
-function getOpData(site) {
-  var q          = ((document.getElementById('op-search')||{}).value||'').toLowerCase();
-  var rankFilter = ((document.getElementById('op-rank-filter')||{}).value||'');
-  var siteFilter = ((document.getElementById('op-site-filter')||{}).value||'');
-  var filter     = siteKey(site);
-  var isJuneOrLater = !siteKey('ai');
-  var inc = PT_DATA.incentive || {};
-
-  var data = PT_DATA.operators.filter(function(op){
-    if (!op.rank) return false;
-    if (isJuneOrLater && op.site === 'AI') return false;
-    if (filter && op.site !== filter) return false;
-    if (rankFilter && op.rank !== rankFilter) return false;
-    if (siteFilter && op.site !== siteFilter) return false;
-    if (q && op.name.toLowerCase().indexOf(q) < 0) return false;
-    // 数値フィルター
-    if (opFilterCol && (opFilterMin !== null || opFilterMax !== null)) {
-      var v = op[opFilterCol];
-      if (v == null) return false;
-      if (opFilterMin !== null && v < opFilterMin) return false;
-      if (opFilterMax !== null && v > opFilterMax) return false;
-    }
-    return true;
-  });
-
-  // ソート
-  data.sort(function(a, b){
-    var va = a[opSortCol]; var vb = b[opSortCol];
-    if (va == null) va = opSortDir === 'desc' ? -Infinity : Infinity;
-    if (vb == null) vb = opSortDir === 'desc' ? -Infinity : Infinity;
-    return opSortDir === 'desc' ? vb - va : va - vb;
-  });
-  return data;
-}
-
-function opRowHtml(op, showInc) {
-  var rc = rankCls(op.rank);
-  var inc = PT_DATA.incentive || {};
-  var incAmt = inc[op.name] || 0;
-  var incFlag = incAmt > 0 ? ' <span title="インセンティブ対象" style="color:#f59e0b">⭐</span>' : '';
-  var incCell = showInc ? '<td class="r" style="color:' + (incAmt>0?'#f59e0b':'var(--text3)') + '">' + (incAmt>0?fc(incAmt):'—') + '</td>' : '';
-  var hasProj = op.projects && op.projects.length > 0;
-  var rowStyle = hasProj ? 'cursor:pointer' : '';
-  var rowClick = hasProj ? 'onclick="openProjectModal(\'' + op.name.replace(/'/g,"\\'") + '\')"' : '';
-  var rowTitle = hasProj ? 'title="クリックで案件内訳を表示"' : '';
-  return '<tr style="' + rowStyle + '" ' + rowClick + ' ' + rowTitle + '>' +
-    '<td style="font-weight:500">' + op.name + incFlag + '</td>' +
-    '<td><span class="rank-badge ' + rc + '">' + (op.rank||'—') + '</span></td>' +
-    '<td style="color:var(--text2)">' + (op.site||'—') + '</td>' +
-    '<td class="r">' + (op.sales>0?fc(op.sales):op.sales<0?'−'+fc(Math.abs(op.sales)):'—') + '</td>' +
-    '<td class="r">' + (op.apo>0?op.apo:'—') + '</td>' +
-    '<td class="r" style="' + (op.cancel>0?'color:var(--red)':'') + '">' + op.cancel + '</td>' +
-    '<td class="r">' + (op.valid>0?op.valid:'—') + '</td>' +
-    '<td class="r">' + (op.calls>0?op.calls.toLocaleString():'—') + '</td>' +
-    '<td class="r">' + (op.apoRate!=null?op.apoRate.toFixed(1)+'%':'—') + '</td>' +
-    '<td class="r">' + (op.unitPerDay>0?fc(op.unitPerDay):(op.days>0&&op.sales>0?fc(Math.round(op.sales/op.days)):'—')) + '</td>' +
-    '<td class="r">' + (op.workH>0?op.workH.toFixed(1)+'h':'—') + '</td>' +
-    incCell +
-    '<td class="r ' + (op.costRate!=null&&op.costRate>0?costCls(op.costRate):'') + '">' + (op.costRate!=null&&op.sales>0?op.costRate.toFixed(1)+'%':'—') + '</td></tr>';
-}
-
-function openProjectModal(name) {
-  var op = PT_DATA.operators.find(function(o){ return o.name === name; });
-  if (!op || !op.projects || !op.projects.length) return;
-  document.getElementById('proj-modal-name').textContent = op.name;
-  document.getElementById('proj-modal-sub').textContent =
-    'TOP' + op.projects.length + '案件 ／ 有効アポ計 ' + op.projects.reduce(function(s,p){return s+p.valid;},0) + '件';
-  var html = op.projects.map(function(p, i) {
-    return '<tr>' +
-      '<td><span style="font-size:10px;color:var(--text3);margin-right:4px">' + (i+1) + '</span>' + p.name + '</td>' +
-      '<td class="r">' + (p.apo || 0) + '</td>' +
-      '<td class="r" style="color:var(--red)">' + (p.cxl || 0) + '</td>' +
-      '<td class="r" style="font-weight:500">' + p.valid + '</td>' +
-      '<td class="r">' + fc(p.sales) + '</td></tr>';
-  }).join('');
-  document.getElementById('proj-modal-tbody').innerHTML = html;
-  var overlay = document.getElementById('project-modal-overlay');
-  overlay.style.display = 'flex';
-}
-
-function closeProjectModal(e) {
-  if (e && e.target !== document.getElementById('project-modal-overlay')) return;
-  document.getElementById('project-modal-overlay').style.display = 'none';
-}
-
-function renderOpTable(site) {
-  var data = getOpData(site);
-  var cntEl = document.getElementById('op-count');
-  if (cntEl) cntEl.textContent = data.length + '名';
-  var tbody = document.getElementById('op-top10-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = data.slice(0,10).map(function(op){ return opRowHtml(op, true); }).join('');
-  // ヘッダーのソート状態を更新
-  document.querySelectorAll('#op-top10-table .sh').forEach(function(th){
-    th.classList.remove('asc','desc');
-    if (th.dataset.col === opSortCol) th.classList.add(opSortDir);
-  });
-}
-
-function renderOpFull(site) {
-  var data = getOpData(site);
-  var cntEl = document.getElementById('op-full-count');
-  if (cntEl) cntEl.textContent = data.length + '名';
-  var tbody = document.getElementById('op-full-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = data.map(function(op){ return opRowHtml(op, true); }).join('');
-}
-
-function opSort(dir) {
-  opSortCol = shMenuCol;
-  opSortDir = dir;
-  closeShMenu();
-  renderOpTable(currentSite);
-  renderOpFull(currentSite);
-}
-
-function opFilterApply() {
-  opFilterCol = shMenuCol;
-  var min = document.getElementById('sh-val-min').value;
-  var max = document.getElementById('sh-val-max').value;
-  opFilterMin = min !== '' ? parseFloat(min) : null;
-  opFilterMax = max !== '' ? parseFloat(max) : null;
-  closeShMenu();
-  renderOpTable(currentSite);
-  renderOpFull(currentSite);
-}
-
-function opFilterClear() {
-  opFilterCol = null; opFilterMin = null; opFilterMax = null;
-  document.getElementById('sh-val-min').value = '';
-  document.getElementById('sh-val-max').value = '';
-  closeShMenu();
-  renderOpTable(currentSite);
-  renderOpFull(currentSite);
-}
-
-function closeShMenu() {
-  document.getElementById('sh-menu').style.display = 'none';
-}
-
-// ヘッダークリックでソート・フィルターメニューを開く
-document.addEventListener('click', function(e) {
-  var th = e.target.closest('.sh');
-  if (th) {
-    e.stopPropagation();
-    var menu = document.getElementById('sh-menu');
-    var col = th.dataset.col;
-    var labels = {sales:'売上',apo:'アポ',cancel:'CXL',valid:'有効',calls:'コール',apoRate:'アポ率',unitPerDay:'単価/日',workH:'労働時間',costRate:'原価率'};
-    document.getElementById('sh-menu-col').textContent = '▼ ' + (labels[col]||col);
-    shMenuCol = col;
-    var rect = th.getBoundingClientRect();
-    menu.style.left = Math.min(rect.left, window.innerWidth - 200) + 'px';
-    menu.style.top  = (rect.bottom + 4) + 'px';
-    menu.style.display = 'block';
-    return;
-  }
-  if (!e.target.closest('#sh-menu')) closeShMenu();
-});
-
-function initSettings() {
-  var t = PT_DATA.targets, m = PT_DATA.meta;
-  // PATをlocalStorageから復元
-  var savedPat = localStorage.getItem('github_pat') || '';
-  var patEl = document.getElementById('s-github-pat');
-  if (patEl && savedPat) patEl.value = savedPat;
-  document.getElementById('s-sales-all').value = t.all.sales;
-  document.getElementById('s-sales-sj').value  = t.shinjuku.sales;
-  document.getElementById('s-sales-rm').value  = t.remote.sales;
-  document.getElementById('s-cost-all').value  = t.all.costRate;
-  document.getElementById('s-cost-sj').value   = t.shinjuku.costRate;
-  document.getElementById('s-cost-rm').value   = t.remote.costRate;
-  document.getElementById('s-unit-all').value  = t.all.unit;
-  document.getElementById('s-unit-sj').value   = t.shinjuku.unit;
-  document.getElementById('s-unit-rm').value   = t.remote.unit;
-  document.getElementById('s-days').value      = m.workingDays;
-}
-function allocateSales() {
-  var total = parseInt(document.getElementById('s-sales-all').value) || 0;
-  if (total <= 0) return;
-  document.getElementById('s-sales-sj').value = Math.round(total * ALLOC_RATIO.shinjuku);
-  document.getElementById('s-sales-rm').value = Math.round(total * ALLOC_RATIO.remote);
-}
-function saveSettings() {
-  // PATをlocalStorageに保存
-  var pat = document.getElementById('s-github-pat').value.trim();
-  if (pat) localStorage.setItem('github_pat', pat);
-  PT_DATA.targets.all.sales      = parseInt(document.getElementById('s-sales-all').value)||0;
-  PT_DATA.targets.shinjuku.sales = parseInt(document.getElementById('s-sales-sj').value)||0;
-  PT_DATA.targets.remote.sales   = parseInt(document.getElementById('s-sales-rm').value)||0;
-  PT_DATA.targets.all.costRate      = parseFloat(document.getElementById('s-cost-all').value)||0;
-  PT_DATA.targets.shinjuku.costRate = parseFloat(document.getElementById('s-cost-sj').value)||0;
-  PT_DATA.targets.remote.costRate   = parseFloat(document.getElementById('s-cost-rm').value)||0;
-  PT_DATA.targets.all.unit      = parseInt(document.getElementById('s-unit-all').value)||0;
-  PT_DATA.targets.shinjuku.unit = parseInt(document.getElementById('s-unit-sj').value)||0;
-  PT_DATA.targets.remote.unit   = parseInt(document.getElementById('s-unit-rm').value)||0;
-  PT_DATA.meta.workingDays = parseInt(document.getElementById('s-days').value)||18;
-  renderDashboard(currentSite);
-  // GitHubに保存（リロード・別画面でも目標値が保持されるように）
-  autoSavePtData('目標設定更新').then(function(r) {
-    if (r && r.success) {
-      alert('保存しました（GitHubに反映済み）');
-    } else if (r && !r.success) {
-      alert('保存しました（GitHub保存失敗 - PATを確認してください）');
-    } else {
-      alert('保存しました（PAT未設定のためGitHub保存はスキップ）');
-    }
-  });
-}
-function cancelSettings() { initSettings(); }
-
-function triggerFile(key) { var i=document.getElementById('file-'+key); if(i) i.click(); }
-function onFileSelect(key, input) {
-  if (!input.files || !input.files.length) return;
-  var file = input.files[0];
-  selectedFiles[key] = file;
-  var el=document.getElementById('text-'+key), drop=document.getElementById('drop-'+key), btn=document.getElementById('clear-'+key);
-  if (el) el.textContent = file.name;
-  if (drop) drop.classList.add('selected');
-  if (btn) btn.style.display = 'inline-block';
-}
-function clearFile(event, key) {
-  event.stopPropagation();
-  delete selectedFiles[key];
-  var el=document.getElementById('text-'+key),drop=document.getElementById('drop-'+key),btn=document.getElementById('clear-'+key),input=document.getElementById('file-'+key);
-  if (el) el.textContent = 'クリックまたはドロップ';
-  if (drop) drop.classList.remove('selected');
-  if (btn) btn.style.display = 'none';
-  if (input) input.value = '';
-}
-function setStep(n, state) {
-  // state: 'active' | 'done' | 'error'
-  for (var i = 1; i <= 5; i++) {
-    var el = document.getElementById('step-' + i);
-    if (!el) continue;
-    el.classList.remove('active', 'done', 'error');
-    if (i < n) el.classList.add('done');
-    else if (i === n) el.classList.add(state);
-  }
-}
-
-function runUpdate() {
-  if (!PT_DATA) { alert('データが読み込まれていません。ページを再読み込みしてください。'); return; }
-  var required = ['apo','prod','work'];
-  var labels = ['アポイントリスト','生産性レポート','勤務データ'];
-  for (var i = 0; i < required.length; i++) {
-    if (!selectedFiles[required[i]]) { alert('必須ファイルが選択されていません：'+labels[i]); return; }
-  }
-  var btn    = document.getElementById('btn-update');
-  var status = document.getElementById('update-status');
-  var result = document.getElementById('update-result');
-  var steps  = document.getElementById('update-steps');
-  btn.disabled = true; btn.textContent = '処理中...';
-  result.style.display = 'none';
-  steps.style.display = 'block';
-
-  // Step1: ファイル確認
-  setStep(1, 'active');
-  status.textContent = 'ファイルを確認中...';
-
-  setTimeout(function() {
-    // Step2: サーバー送信
-    setStep(2, 'active');
-    status.textContent = 'サーバーに送信中（初回は50秒程度かかる場合があります）...';
-
-    var form = new FormData();
-    form.append('apo',    selectedFiles['apo']);
-    form.append('prod',   selectedFiles['prod']);
-    form.append('work',   selectedFiles['work']);
-    if (selectedFiles['master']) form.append('master', selectedFiles['master']);
-    if (selectedFiles['inc'])    form.append('inc',    selectedFiles['inc']);
-    var ptBlob = new Blob([JSON.stringify(PT_DATA)], {type:'application/json'});
-    form.append('prev', ptBlob, 'pt_data.json');
-
-    // Step3: 集計処理（送信後すぐに表示）
-    setStep(3, 'active');
-    status.textContent = 'サーバーで集計処理中...';
-
-    fetch(SERVER_URL+'/update', {method:'POST', body:form})
-    .then(function(res){ return res.json(); })
-    .then(function(data) {
-      if (data.error) {
-        setStep(3, 'error');
-        btn.disabled = false; btn.textContent = '更新する';
-        status.textContent = '❌ 集計エラー';
-        result.style.display = 'block';
-        result.innerHTML = '<div class="alert" style="border-color:var(--red);background:var(--red-light);color:var(--red)"><div class="alert-dot" style="background:var(--red)"></div>' + data.error + '</div>';
-        return;
-      }
-
-      // Step4: 画面反映
-      setStep(4, 'active');
-      status.textContent = '画面に反映中...';
-
-      PT_DATA = data.data;
-      if (additionalRevenues.length > 0) PT_DATA.additionalRevenues = additionalRevenues;
-      renderDashboard(currentSite); renderDaily(currentSite); renderOpSummary(currentSite); renderOpTable(currentSite); renderChart2();
-      document.getElementById('updateTime').textContent = '最終更新: ' + PT_DATA.meta.lastUpdateLabel;
-      document.getElementById('alertText').textContent  = PT_DATA.meta.alertText;
-      _showWorkPeriodWarning(PT_DATA.meta.workPeriodWarning);
-      result.style.display = 'block';
-      result.innerHTML = '<div class="alert" style="border-color:var(--green);background:var(--green-light);color:var(--green)"><div class="alert-dot" style="background:var(--green)"></div>更新完了。累計' + PT_DATA.meta.elapsedDays + '営業日 / 売上' + fc(PT_DATA.sites.all.sales) + ' / 原価率' + PT_DATA.sites.all.costRate + '%</div>';
-
-      // Step5: GitHub保存
-      setStep(5, 'active');
-      status.textContent = 'GitHubに保存中...';
-      autoSavePtData('データ更新').then(function(r) {
-        btn.disabled = false; btn.textContent = '更新する';
-        if (r && r.success) {
-          setStep(5, 'done');
-          status.textContent = '✅ 更新完了！（GitHub保存済み）';
-        } else {
-          setStep(5, 'error');
-          status.textContent = '✅ 更新完了（GitHub保存失敗 - PATを確認）';
-        }
-      });
-    })
-    .catch(function(err) {
-      setStep(2, 'error');
-      btn.disabled = false; btn.textContent = '更新する';
-      status.textContent = '❌ 通信エラー（サーバーが起動中の場合は1分後に再試行してください）';
-    });
-  }, 300);
-}
-
-// ===== スタッフ管理 =====
-var staffData = [];
-
-function switchSettingTab(tab, el) {
-  document.querySelectorAll('#page-settings .site-tab').forEach(function(t){ t.classList.remove('active'); });
-  if (el) el.classList.add('active');
-  document.getElementById('stab-panel-target').style.display = tab === 'target' ? 'block' : 'none';
-  document.getElementById('stab-panel-staff').style.display  = tab === 'staff'  ? 'block' : 'none';
-  if (tab === 'staff') loadStaff();
-}
-
-function loadStaff() {
-  fetch(SERVER_URL + '/staff')
-    .then(function(r){ return r.json(); })
-    .then(function(d) {
-      staffData = d.data || [];
-      renderStaffTable(staffData);
-    })
-    .catch(function(e) {
-      document.getElementById('staff-tbody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--red);padding:20px">読み込みエラー</td></tr>';
-    });
-}
-
-function renderStaffTable(data) {
-  document.getElementById('staff-count').textContent = data.length + '名';
-  var siteLabel = {'新宿SC':'新宿SC','在宅G':'リモートSC','AI':'AI'};
-  var rows = '';
-  for (var i = 0; i < data.length; i++) {
-    var s = data[i];
-    var rc = rankCls(s.rank);
-    var rate = s.salary_type === 'monthly' ? fc(s.hourly_rate) + '/月' : '¥' + s.hourly_rate.toLocaleString() + '/時';
-    var activeLabel = s.is_active ? '在籍' : '退職';
-    var activeBg = s.is_active ? 'var(--green-light)' : 'var(--gray-light)';
-    var activeColor = s.is_active ? 'var(--green)' : 'var(--gray)';
-    rows += '<tr>' +
-      '<td style="font-size:11px;color:var(--text3)">' + s.employee_id + '</td>' +
-      '<td style="font-weight:500">' + s.name + '</td>' +
-      '<td>' + (siteLabel[s.site] || s.site) + '</td>' +
-      '<td><span class="rank-badge ' + rc + '">' + s.rank + '</span></td>' +
-      '<td class="r">' + rate + '</td>' +
-      '<td>' + (s.salary_type === 'monthly' ? '月給' : '時給') + '</td>' +
-      '<td><span style="font-size:10px;padding:2px 7px;border-radius:4px;font-weight:500;background:' + activeBg + ';color:' + activeColor + '">' + activeLabel + '</span></td>' +
-      '<td style="white-space:nowrap">' +
-        '<button data-id="' + s.id + '" data-action="edit" style="font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:#fff;cursor:pointer;margin-right:4px">編集</button>' +
-        '<button data-id="' + s.id + '" data-action="delete" style="font-size:11px;padding:2px 8px;border:1px solid var(--red);border-radius:4px;background:#fff;color:var(--red);cursor:pointer">削除</button>' +
-      '</td></tr>';
-  }
-  var tbody = document.getElementById('staff-tbody');
-  tbody.innerHTML = rows || '<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:20px">データなし</td></tr>';
-  // イベントリスナーをtbodyに委譲
-  tbody.onclick = function(e) {
-    var btn = e.target.closest('button[data-id]');
-    if (!btn) return;
-    var id = parseInt(btn.getAttribute('data-id'));
-    var action = btn.getAttribute('data-action');
-    if (action === 'edit') openEditStaff(id);
-    else if (action === 'delete') confirmDelete(id);
-  };
-}
-
-function filterStaffTable() {
-  var q = (document.getElementById('staff-search').value || '').toLowerCase();
-  var filtered = staffData.filter(function(s){ return !q || s.name.toLowerCase().indexOf(q) >= 0 || s.employee_id.toLowerCase().indexOf(q) >= 0; });
-  renderStaffTable(filtered);
-}
-
-function openAddStaff() {
-  document.getElementById('modal-title').textContent = 'スタッフ追加';
-  document.getElementById('m-id').value = '';
-  document.getElementById('m-empid').value = '';
-  document.getElementById('m-name').value = '';
-  document.getElementById('m-site').value = '新宿SC';
-  document.getElementById('m-rank').value = 'ルーキー';
-  document.getElementById('m-rate').value = '';
-  document.getElementById('m-stype').value = 'hourly';
-  document.getElementById('m-active').checked = true;
-  document.getElementById('modal-error').style.display = 'none';
-  document.getElementById('staff-modal').style.display = 'flex';
-}
-
-function openEditStaff(id) {
-  var s = staffData.find(function(x){ return x.id === id; });
-  if (!s) return;
-  document.getElementById('modal-title').textContent = 'スタッフ編集：' + s.name;
-  document.getElementById('m-id').value = s.id;
-  document.getElementById('m-empid').value = s.employee_id;
-  document.getElementById('m-name').value = s.name;
-  document.getElementById('m-site').value = s.site;
-  document.getElementById('m-rank').value = s.rank;
-  document.getElementById('m-rate').value = s.hourly_rate;
-  document.getElementById('m-stype').value = s.salary_type;
-  document.getElementById('m-active').checked = s.is_active;
-  document.getElementById('modal-error').style.display = 'none';
-  document.getElementById('staff-modal').style.display = 'flex';
-}
-
-function closeModal() {
-  document.getElementById('staff-modal').style.display = 'none';
-}
-
-function saveStaff() {
-  var id    = document.getElementById('m-id').value;
-  var empid = document.getElementById('m-empid').value.trim();
-  var name  = document.getElementById('m-name').value.trim();
-  var site  = document.getElementById('m-site').value;
-  var rank  = document.getElementById('m-rank').value;
-  var rate  = parseInt(document.getElementById('m-rate').value) || 0;
-  var stype = document.getElementById('m-stype').value;
-  var active= document.getElementById('m-active').checked;
-  var errEl = document.getElementById('modal-error');
-
-  if (!empid || !name) {
-    errEl.textContent = '社員番号と氏名は必須です';
-    errEl.style.display = 'block';
-    return;
-  }
-
-  var body = {employee_id: empid, name: name, site: site, rank: rank, hourly_rate: rate, salary_type: stype, is_active: active};
-  var url    = SERVER_URL + '/staff' + (id ? '/' + id : '');
-  var method = id ? 'PUT' : 'POST';
-
-  fetch(url, {method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
-    .then(function(r){ return r.json(); })
-    .then(function(d) {
-      if (d.error) { errEl.textContent = d.error; errEl.style.display = 'block'; return; }
-      closeModal();
-      loadStaff();
-    })
-    .catch(function(e) {
-      errEl.textContent = '通信エラーが発生しました';
-      errEl.style.display = 'block';
-    });
-}
-
-function confirmDelete(id) {
-  var s = staffData.find(function(x){ return x.id === id; });
-  var name = s ? s.name : 'このスタッフ';
-  if (!confirm(name + ' を削除しますか？この操作は取り消せません。')) return;
-  deleteStaff(id);
-}
-function deleteStaff(id) {
-  fetch(SERVER_URL + '/staff/' + id, {method: 'DELETE'})
-    .then(function(r){ return r.json(); })
-    .then(function(d) {
-      if (d.error) { alert('削除エラー: ' + d.error); return; }
-      loadStaff();
-    });
-}
-
-// ===== 追加収益管理 =====
-var additionalRevenues = [];
-
-function renderRevenueList() {
-  var tbody = document.getElementById('revenue-tbody');
-  var totalEl = document.getElementById('revenue-total');
-  if (!tbody) return;
-  if (additionalRevenues.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px">登録なし</td></tr>';
-    if (totalEl) totalEl.textContent = '¥0';
-    return;
-  }
-  var total = 0;
-  var html = '';
-  for (var i = 0; i < additionalRevenues.length; i++) {
-    var r = additionalRevenues[i];
-    total += r.amount || 0;
-    html += '<tr>' +
-      '<td>' + r.type + '</td>' +
-      '<td>' + (r.name || '—') + '</td>' +
-      '<td class="r">' + fc(r.amount) + '</td>' +
-      '<td style="white-space:nowrap">' +
-        '<button data-idx="' + i + '" onclick="openEditRevenue(this)" style="font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:#fff;cursor:pointer;margin-right:4px">編集</button>' +
-        '<button data-idx="' + i + '" onclick="deleteRevenue(this)" style="font-size:11px;padding:2px 8px;border:1px solid var(--red);border-radius:4px;background:#fff;color:var(--red);cursor:pointer">削除</button>' +
-      '</td></tr>';
-  }
-  tbody.innerHTML = html;
-  if (totalEl) totalEl.textContent = fc(total);
-}
-
-function openAddRevenue() {
-  document.getElementById('rev-modal-title').textContent = '追加収益を追加';
-  document.getElementById('rev-type').value = 'BPO通話料';
-  document.getElementById('rev-name').value = '';
-  document.getElementById('rev-amount').value = '';
-  document.getElementById('rev-edit-idx').value = '-1';
-  document.getElementById('revenue-modal').style.display = 'flex';
-}
-
-function openEditRevenue(btn) {
-  var idx = parseInt(btn.getAttribute('data-idx'));
-  var r = additionalRevenues[idx];
-  document.getElementById('rev-modal-title').textContent = '追加収益を編集';
-  document.getElementById('rev-type').value = r.type;
-  document.getElementById('rev-name').value = r.name || '';
-  document.getElementById('rev-amount').value = r.amount || '';
-  document.getElementById('rev-edit-idx').value = idx;
-  document.getElementById('revenue-modal').style.display = 'flex';
-}
-
-function deleteRevenue(btn) {
-  var idx = parseInt(btn.getAttribute('data-idx'));
-  additionalRevenues.splice(idx, 1);
-  renderRevenueList();
-}
-
-function closeRevenueModal() {
-  document.getElementById('revenue-modal').style.display = 'none';
-}
-
-function confirmRevenue() {
-  var type   = document.getElementById('rev-type').value;
-  var name   = document.getElementById('rev-name').value.trim();
-  var amount = parseInt(document.getElementById('rev-amount').value) || 0;
-  var idx    = parseInt(document.getElementById('rev-edit-idx').value);
-  if (!name)    { alert('クライアント名を入力してください'); return; }
-  if (amount <= 0) { alert('金額を入力してください'); return; }
-  if (idx >= 0) {
-    additionalRevenues[idx] = {type: type, name: name, amount: amount};
-  } else {
-    additionalRevenues.push({type: type, name: name, amount: amount});
-  }
-  closeRevenueModal();
-  renderRevenueList();
-}
-
-function getExtraTotal() {
-  return additionalRevenues.reduce(function(sum, r) { return sum + (r.amount || 0); }, 0);
-}
-
-function saveRevenue() {
-  if (!PT_DATA) { alert('データが読み込まれていません'); return; }
-  var btn = document.getElementById('btn-save-revenue');
-  var resultEl = document.getElementById('revenue-save-result');
-  btn.disabled = true;
-  btn.textContent = '保存中...';
-  var baseSales = PT_DATA._baseSales !== undefined ? PT_DATA._baseSales : PT_DATA.sites.all.sales;
-  var baseGross = PT_DATA._baseGross !== undefined ? PT_DATA._baseGross : PT_DATA.sites.all.gross;
-  var extraTotal = getExtraTotal();
-  PT_DATA._baseSales = baseSales;
-  PT_DATA._baseGross = baseGross;
-  PT_DATA.additionalRevenues = additionalRevenues;
-  PT_DATA.additionalTotal    = extraTotal;
-  PT_DATA.sites.all.sales    = baseSales + extraTotal;
-  PT_DATA.sites.all.gross    = baseGross + extraTotal;
-  PT_DATA.sites.all.costRate = PT_DATA.sites.all.sales > 0
-    ? Math.round(PT_DATA.sites.all.labor / PT_DATA.sites.all.sales * 1000) / 10 : 0;
-  renderDashboard(currentSite);
-  var blob = new Blob([JSON.stringify(PT_DATA, null, 2)], {type: 'application/json'});
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url; a.download = 'pt_data.json'; a.click();
-  URL.revokeObjectURL(url);
-  btn.disabled = false;
-  btn.textContent = '保存して反映する';
-  var pat = getGithubPat();
-  if (pat) {
-    autoSavePtData('追加収益更新').then(function(r) {
-      if (resultEl) {
-        resultEl.style.display = 'block';
-        var ghMsg = r && r.success ? '✅ GitHubに自動保存しました' : '⚠️ GitHub保存失敗（手動ダウンロードしてください）';
-        resultEl.innerHTML = '<div class="alert" style="border-color:var(--green);background:var(--green-light);color:var(--green)"><div class="alert-dot" style="background:var(--green)"></div>保存・反映しました。<br><span style="font-size:11px">'+ghMsg+'</span></div>';
-      }
-    });
-  } else {
-    if (resultEl) {
-      resultEl.style.display = 'block';
-      resultEl.innerHTML = '<div class="alert" style="border-color:var(--green);background:var(--green-light);color:var(--green)"><div class="alert-dot" style="background:var(--green)"></div>保存しました。ダウンロードされたpt_data.jsonをGitHubに上書きしてください。</div>';
-    }
-  }
-}
-
-function downloadPtData() {
-  if (!PT_DATA) return;
-  var blob = new Blob([JSON.stringify(PT_DATA, null, 2)], {type: 'application/json'});
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = 'pt_data.json';
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-</script>
-
-<script>
-// ===== 日次明細モーダル =====
-var _dailyModalRows = [];
-
-function openDailyModal(idx) {
-  var rows = PT_DATA.daily['all'] || [];
-  var r = rows[idx];
-  if (!r) return;
-  _dailyModalRows = rows;
-
-  var totalLabor  = (PT_DATA.sites.all && PT_DATA.sites.all.labor) ? PT_DATA.sites.all.labor : 0;
-  var elapsed     = PT_DATA.meta.elapsedDays || rows.length;
-  var laborPerDay = r.daily_labor != null ? r.daily_labor :
-                    (elapsed > 0 ? Math.round(totalLabor / elapsed) : 0);
-  var costRate = r.sales > 0 && laborPerDay > 0 ? (laborPerDay / r.sales * 100).toFixed(1) + '%' : '—';
-
-  document.getElementById('daily-modal-title').textContent = r.date + '（' + r.day + '）';
-  document.getElementById('daily-modal-sub').textContent =
-    '売上 ' + fc(r.sales) + '　有効アポ ' + r.valid + '件　原価率 ' + costRate;
-
-  // サマリーカード
-  document.getElementById('daily-modal-summary').innerHTML =
-    '<div style="background:var(--bg);border-radius:6px;padding:10px 12px"><div style="font-size:10px;color:var(--text3);margin-bottom:3px">売上</div><div style="font-size:17px;font-weight:500">' + fc(r.sales) + '</div></div>' +
-    '<div style="background:var(--bg);border-radius:6px;padding:10px 12px"><div style="font-size:10px;color:var(--text3);margin-bottom:3px">アポ / CXL / 有効</div><div style="font-size:17px;font-weight:500">' + r.apo + ' / <span style="color:var(--red)">' + r.cancel + '</span> / ' + r.valid + '</div></div>' +
-    '<div style="background:var(--bg);border-radius:6px;padding:10px 12px"><div style="font-size:10px;color:var(--text3);margin-bottom:3px">人件費 / 原価率</div><div style="font-size:17px;font-weight:500">' + (laborPerDay > 0 ? fc(laborPerDay) : '—') + '<span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:4px">' + costRate + '</span></div></div>';
-
-  // 案件内訳
-  var projs = r.top_projects || [];
-  var maxV  = r.max_valid || 1;
-  document.getElementById('daily-proj-list').innerHTML = projs.length > 0
-    ? projs.map(function(p, i) {
-        var barW = Math.round(p.valid / maxV * 100);
-        return '<div>' +
-          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">' +
-            '<div style="display:flex;align-items:center;gap:6px">' +
-              '<span style="font-size:10px;color:var(--text3);min-width:12px">' + (i+1) + '</span>' +
-              '<span style="font-size:13px;font-weight:500">' + p.name + '</span>' +
-            '</div>' +
-            '<div style="display:flex;gap:12px;font-size:12px;color:var(--text3)">' +
-              '<span style="font-weight:500;color:var(--text)">' + p.valid + '件</span>' +
-              '<span>' + fc(p.sales) + '</span>' +
-            '</div>' +
-          '</div>' +
-          '<div style="height:5px;background:var(--orange);border-radius:3px;width:' + barW + '%;opacity:' + (1 - i * 0.12).toFixed(2) + '"></div>' +
-        '</div>';
-      }).join('')
-    : '<div style="color:var(--text3);font-size:12px;text-align:center;padding:20px">案件データなし</div>';
-
-  // 個人成果
-  var dOps = r.daily_ops || [];
-  document.getElementById('daily-ops-tbody').innerHTML = dOps.length > 0
-    ? dOps.map(function(op, i) {
-        var projTags = (op.projects || []).map(function(p) {
-          return '<span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;background:var(--bg);border:0.5px solid var(--border);margin:1px">' + p.name + ' ' + p.valid + '件</span>';
-        }).join('');
-        var cr = op.costRate != null ? '<span class="' + costCls(op.costRate) + '">' + op.costRate.toFixed(1) + '%</span>' : '—';
-        return '<tr>' +
-          '<td style="font-size:11px;color:var(--text3)">' + (i+1) + '</td>' +
-          '<td style="font-weight:500">' + op.name + '</td>' +
-          '<td style="line-height:1.8">' + (projTags || '<span style="color:var(--text3);font-size:11px">—</span>') + '</td>' +
-          '<td class="r">' + (op.sales > 0 ? fc(op.sales) : '<span style="color:var(--text3)">—</span>') + '</td>' +
-          '<td class="r">' + cr + '</td></tr>';
-      }).join('')
-    : '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:20px">データなし</td></tr>';
-
-  switchDailyTab('proj');
-  document.getElementById('daily-modal-overlay').style.display = 'flex';
-}
-
-function switchDailyTab(tab) {
-  document.getElementById('daily-tab-proj').style.display = tab === 'proj' ? 'block' : 'none';
-  document.getElementById('daily-tab-ops').style.display  = tab === 'ops'  ? 'block' : 'none';
-  var btnProj = document.getElementById('dtab-proj');
-  var btnOps  = document.getElementById('dtab-ops');
-  if (btnProj) {
-    btnProj.style.background = tab === 'proj' ? 'var(--orange)' : 'var(--bg)';
-    btnProj.style.color      = tab === 'proj' ? '#fff' : 'var(--text2)';
-    btnProj.style.borderColor= tab === 'proj' ? 'var(--orange)' : 'var(--border)';
-  }
-  if (btnOps) {
-    btnOps.style.background  = tab === 'ops' ? 'var(--orange)' : 'var(--bg)';
-    btnOps.style.color       = tab === 'ops' ? '#fff' : 'var(--text2)';
-    btnOps.style.borderColor = tab === 'ops' ? 'var(--orange)' : 'var(--border)';
-  }
-}
-
-function closeDailyModal(e) {
-  if (e && e.target !== document.getElementById('daily-modal-overlay')) return;
-  document.getElementById('daily-modal-overlay').style.display = 'none';
-}
-function exportJSON() {
-  if (!PT_DATA) return;
-  var out = { meta: PT_DATA.meta };
-  if (document.getElementById('ex-op')    && document.getElementById('ex-op').checked)    out.operators = PT_DATA.operators;
-  if (document.getElementById('ex-daily') && document.getElementById('ex-daily').checked)  out.daily     = PT_DATA.daily;
-  if (document.getElementById('ex-rank')  && document.getElementById('ex-rank').checked)   out.sites     = PT_DATA.sites;
-  if (document.getElementById('ex-heat')  && document.getElementById('ex-heat').checked)   out.heatmap   = PT_DATA.heatmap;
-  if (document.getElementById('ex-sites') && document.getElementById('ex-sites').checked)  out.targets   = PT_DATA.targets;
-  var month = (PT_DATA.meta.month || '').replace(/[年月]/g, '-').replace(/-$/, '');
-  var fname = 'pt_data_' + month + '_' + new Date().toISOString().slice(0,10) + '.json';
-  var blob = new Blob([JSON.stringify(out, null, 2)], {type:'application/json'});
-  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname; a.click();
-  URL.revokeObjectURL(a.href);
-  var st = document.getElementById('export-status');
-  if (st) st.textContent = '✅ ' + fname + ' をダウンロードしました';
-}
-
-function exportCSV() {
-  if (!PT_DATA) return;
-  var parts = [];
-  var month = (PT_DATA.meta.month || '').replace(/[年月]/g, '-').replace(/-$/, '');
-
-  // OP個人実績
-  if (document.getElementById('ex-op') && document.getElementById('ex-op').checked) {
-    var inc = PT_DATA.incentive || {};
-    var header = ['氏名','ランク','サイト','売上','アポ','CXL','有効','コール','アポ率','単価/日','労働時間','インセンティブ','原価率'];
-    var rows = PT_DATA.operators
-      .filter(function(op){ return op.rank; })
-      .map(function(op){
+    def _top10(dg, dc, ts):
+        pg = dg.groupby('登録案件名').agg(
+            apo=('アポイントID','count'), sg=('sales','sum')).reset_index()
+        pc = dc.groupby('登録案件名').agg(
+            cxl=('アポイントID','count'), sc=('sales','sum')).reset_index()
+        proj = pg.merge(pc, on='登録案件名', how='left').fillna(0)
+        proj['valid'] = (proj['apo'] - proj['cxl']).astype(int)
+        proj['net']   = (proj['sg']  - proj['sc']).astype(int)
+        proj = proj[proj['valid'] > 0].sort_values('net', ascending=False).head(20)
         return [
-          op.name, op.rank, op.site,
-          op.sales || 0, op.apo || 0, op.cancel || 0, op.valid || 0,
-          op.calls || 0,
-          op.apoRate != null ? op.apoRate.toFixed(1) : '',
-          op.unitPerDay || '',
-          op.workH != null ? op.workH : '',
-          inc[op.name] || 0,
-          op.costRate != null ? op.costRate.toFixed(1) : ''
-        ].map(function(v){ return '"' + String(v).replace(/"/g,'""') + '"'; }).join(',');
-      });
-    parts.push('■OP個人実績');
-    parts.push(header.map(function(h){return '"'+h+'"';}).join(','));
-    parts = parts.concat(rows);
-    parts.push('');
-  }
+            {'rank': i+1, 'name': str(r['登録案件名']),
+             'valid': int(r['valid']), 'sales': int(r['net']),
+             'pct': round(r['net'] / ts * 100, 1) if ts > 0 else 0}
+            for i, (_, r) in enumerate(proj.iterrows())
+        ]
 
-  // 日次明細
-  if (document.getElementById('ex-daily') && document.getElementById('ex-daily').checked) {
-    var drows = PT_DATA.daily['all'] || [];
-    var dheader = ['営業日','日付','売上','アポ','CXL','有効','稼働','コール'];
-    parts.push('■日次明細');
-    parts.push(dheader.map(function(h){return '"'+h+'"';}).join(','));
-    drows.forEach(function(r){
-      parts.push([r.day, r.date, r.sales, r.apo, r.cancel, r.valid, r.ops, r.calls]
-        .map(function(v){return '"'+String(v)+'"';}).join(','));
-    });
-    parts.push('');
-  }
+    result = {'all': _top10(df_g, df_c, total_sales)}
 
-  // BOM付きShift-JIS的にUTF-8 BOMで代用（Excel対応）
-  var csv = '\uFEFF' + parts.join('\r\n');
-  var fname = 'pt_export_' + month + '_' + new Date().toISOString().slice(0,10) + '.csv';
-  var blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
-  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname; a.click();
-  URL.revokeObjectURL(a.href);
-  var st = document.getElementById('export-status');
-  if (st) st.textContent = '✅ ' + fname + ' をダウンロードしました';
-}
-var GITHUB_OWNER  = 'DGLOSS-2009';
-var GITHUB_REPO   = 'dgross-dashboard';
-var GITHUB_BRANCH = 'main';
+    # サイト別
+    if site_map and site_label:
+        df_g['site_raw'] = df_g['社員番号'].map(
+            {k: v for k, v in site_map.items()}).fillna(
+            df_g['スタッフ名'].map({k: v for k, v in site_map.items()}))
+        df_c['site_raw'] = df_c['社員番号'].map(
+            {k: v for k, v in site_map.items()}).fillna(
+            df_c['スタッフ名'].map({k: v for k, v in site_map.items()}))
+        for key, raw in [('shinjuku', gemba_raw), ('remote','在宅G'), ('ai','AI')]:
+            dg_s = df_g[df_g['site_raw'] == raw]
+            dc_s = df_c[df_c['site_raw'] == raw]
+            ts_s = int(dg_s['sales'].sum()) - int(dc_s['sales'].sum())
+            result[key] = _top10(dg_s, dc_s, ts_s)
+    else:
+        for key in ['shinjuku', 'remote', 'ai']:
+            result[key] = result['all']
 
-function getGithubPat() {
-  return localStorage.getItem('github_pat') || '';
-}
-function githubHeaders() {
-  var pat = getGithubPat();
-  var authPrefix = pat.indexOf('github_pat_') === 0 ? 'Bearer' : 'token';
-  return {'Authorization': authPrefix+' '+pat, 'Content-Type':'application/json', 'Accept':'application/vnd.github.v3+json'};
-}
-function githubPutFile(path, content, message) {
-  return fetch('https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/'+path, {headers:githubHeaders()})
-  .then(function(r){return r.json();})
-  .then(function(d){
-    var body={message:message,content:btoa(unescape(encodeURIComponent(content))),branch:GITHUB_BRANCH};
-    if(d.sha) body.sha=d.sha;
-    return fetch('https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/'+path,{method:'PUT',headers:githubHeaders(),body:JSON.stringify(body)});
-  })
-  .then(function(r){return r.json();})
-  .then(function(d){if(d.content)return d; throw new Error(d.message||'GitHub書き込みエラー: '+path);});
-}
-function getCurrentFolder() {
-  var m = window.location.pathname.match(/(\d{4}-\d{2})/);
-  return m ? m[1] : null;
-}
-function autoSavePtData(successMsg) {
-  var pat = getGithubPat();
-  if (!pat) return Promise.resolve(null);
-  var folder = getCurrentFolder();
-  if (!folder) return Promise.resolve(null);
-  return githubPutFile(folder+'/pt_data.json', JSON.stringify(PT_DATA,null,2), 'データ更新: '+(PT_DATA.meta.lastUpdateLabel||''))
-    .then(function(){ return {success:true, msg:successMsg||'GitHubに自動保存しました'}; })
-    .catch(function(e){ return {success:false, msg:e.message}; });
-}
-
-// ナビゲーション関数（翌月HTML生成後も保持される）
-function goTop() {
-  // window.location.href で遷移（ポップアップブロック回避）
-  if (window.location.href.indexOf('github.io') >= 0) {
-    window.location.href = 'https://DGLOSS-2009.github.io/dgross-dashboard/';
-  } else {
-    window.open('https://DGLOSS-2009.github.io/dgross-dashboard/', '_blank');
-  }
-}
-function goToMonth(val) {
-  if (!val) return;
-  if (window.location.href.indexOf('github.io') >= 0) {
-    window.location.href = '../' + val + '/';
-  } else {
-    window.open('https://DGLOSS-2009.github.io/dgross-dashboard/' + val + '/', '_blank');
-  }
-}
-
-// monthSelectを動的生成
-// 開始月（2026年5月）〜 PT_DATAの現在月まで全optionを生成
-function buildMonthSelect() {
-  var sel = document.getElementById('monthSelect');
-  if (!sel) return;
-
-  // 現在月をPT_DATAから取得
-  var currentKey = '2026-05'; // フォールバック
-  if (PT_DATA && PT_DATA.meta && PT_DATA.meta.month) {
-    var mm = PT_DATA.meta.month.match(/(\d{4})年(\d+)月/);
-    if (mm) {
-      currentKey = mm[1] + '-' + String(parseInt(mm[2])).padStart(2, '0');
-    }
-  }
-
-  // 開始月固定
-  var startYear = 2026, startMonth = 5;
-  var endYear   = parseInt(currentKey.split('-')[0]);
-  var endMonth  = parseInt(currentKey.split('-')[1]);
-
-  sel.innerHTML = '';
-  var y = startYear, m = startMonth;
-  while (y < endYear || (y === endYear && m <= endMonth)) {
-    var key  = y + '-' + String(m).padStart(2, '0');
-    var label = y + '年' + m + '月';
-    var opt  = document.createElement('option');
-    opt.value = key;
-    opt.textContent = label;
-    if (key === currentKey) opt.selected = true;
-    sel.appendChild(opt);
-    m++;
-    if (m > 12) { m = 1; y++; }
-  }
-}
-
-(function(){
-  // PT_DATA読み込み後にmonthSelectを構築
-  // PT_DATAはfetchで非同期取得されるため、init完了後に呼び出す
-  // → initPtData()の完了フックとして登録
-  window._onPtDataReady = window._onPtDataReady || [];
-  window._onPtDataReady.push(buildMonthSelect);
-})();
+    return result
 
 
-</script>
-</body>
-</html>
+def _calc_operators(df_apo, biz_dates, df_master, df_prod,
+                    work_by_id, labor_by_id, days_by_id, id_map,
+                    site_map, rank_map, inc_map, elapsed, working,
+                    kono_excluded=True, site_label=None, id_site_map=None):
+    """OP個人実績"""
+    if site_label is None:
+        site_label = SITE_LABEL
+    kono_filter_get = (df_apo['スタッフ名'] != KONO) if kono_excluded else pd.Series([True]*len(df_apo), index=df_apo.index)
+    df_get = df_apo[
+        df_apo['取得日'].isin(biz_dates) &
+        kono_filter_get
+    ].copy()
+
+    kouryo = (
+        df_apo['cancel_date_str'].str.contains('考慮', na=False) &
+        df_apo['cancel_date_str'].str.extract(
+            r'(\d{4}/\d+/\d+)', expand=False).isin(biz_dates)
+    )
+    df_cxl_op   = df_apo[df_apo['cancel_date_str'].isin(biz_dates) | kouryo].copy()
+    df_cxl_dash = df_apo[df_apo['cancel_date_str'].isin(biz_dates)].copy()
+
+    op_get    = df_get.groupby('社員番号').agg(
+        apo=('アポイントID', 'count'), sg=('sales', 'sum')).reset_index()
+    op_cxl_op = df_cxl_op.groupby('社員番号').agg(
+        cxl_op=('アポイントID', 'count'), sc_op=('sales', 'sum')).reset_index()
+    op_cxl_d  = df_cxl_dash.groupby('社員番号').agg(
+        cxl_d=('アポイントID', 'count'), sc_d=('sales', 'sum')).reset_index()
+
+    # 生産性レポートのコール集計（日付正規化済み列を使用）
+    if '日付_norm' in df_prod.columns and biz_dates:
+        month_prefix = biz_dates[0][:7]  # 例：2026/05
+        prod_month = df_prod[df_prod['日付_norm'].str.startswith(month_prefix)]
+    else:
+        prod_month = df_prod
+    agent_col = None
+    for col in ['エージェント', 'エージェント名', 'Agent']:
+        if col in prod_month.columns:
+            agent_col = col
+            break
+    if agent_col:
+        calls_total = prod_month.groupby(agent_col)['コール数'].sum().to_dict()
+    else:
+        calls_total = {}
+
+    # 集計対象：マスター全員＋アポリストに存在するID
+    all_ids = set(list(df_master['社員番号']) +
+                  list(op_get['社員番号'].astype(str).tolist()))
+    operators = []
+
+    for emp_id in all_ids:
+        emp_id = str(emp_id).strip()
+        lookup = B_TO_D.get(emp_id, emp_id)
+        # スタッフ名はマスターから取得
+        name = dict(zip(df_master['社員番号'], df_master['スタッフ名'])).get(lookup) or \
+               dict(zip(df_master['社員番号'], df_master['スタッフ名'])).get(emp_id, '')
+        if not name:
+            continue
+
+        g  = op_get[op_get['社員番号'].astype(str) == emp_id]
+        co = op_cxl_op[op_cxl_op['社員番号'].astype(str) == emp_id]
+        cd = op_cxl_d[op_cxl_d['社員番号'].astype(str) == emp_id]
+        # B_TO_Dで変換される場合も考慮
+        if len(g) == 0:
+            alt = B_TO_D.get(emp_id)
+            if alt:
+                g  = op_get[op_get['社員番号'].astype(str) == alt]
+                co = op_cxl_op[op_cxl_op['社員番号'].astype(str) == alt]
+                cd = op_cxl_d[op_cxl_d['社員番号'].astype(str) == alt]
+
+        apo    = int(g['apo'].iloc[0])      if len(g)  > 0 else 0
+        sg     = int(g['sg'].iloc[0])       if len(g)  > 0 else 0
+        cxl_op = int(co['cxl_op'].iloc[0]) if len(co) > 0 else 0
+        sc_op  = int(co['sc_op'].iloc[0])  if len(co) > 0 else 0
+        cxl_d  = int(cd['cxl_d'].iloc[0]) if len(cd) > 0 else 0
+        sc_d   = int(cd['sc_d'].iloc[0])   if len(cd) > 0 else 0
+
+        net_op   = sg - sc_op
+        net_dash = sg - sc_d
+        calls    = int(calls_total.get(name, 0))
+
+        lookup = B_TO_D.get(emp_id, emp_id)
+        hours  = work_by_id.get(lookup)  or work_by_id.get(emp_id, 0)
+        l_base = labor_by_id.get(lookup) or labor_by_id.get(emp_id, 0)
+        inc_t  = inc_map.get(name, 0)
+        inc_day= round(inc_t / working * elapsed) if inc_t > 0 else 0
+        labor  = l_base + inc_day
+
+        days = days_by_id.get(lookup) or days_by_id.get(emp_id)
+        if days is None:
+            days = round(float(hours) / 8, 1) if hours and float(hours) > 0 else 0
+        else:
+            days = float(days)
+
+        ar     = round(apo / calls * 100, 1)    if calls > 0 else None
+        cost_r = round(labor / net_op * 100, 1) if net_op > 0 and labor > 0 else None
+        # サイト：id_site_mapから直接取得（社員番号ベース）
+        site_raw = (id_site_map or {}).get(lookup) or \
+                   (id_site_map or {}).get(emp_id) or \
+                   site_map.get(name, '')
+        site_d = site_label.get(site_raw, '')
+        rank_d = rank_map.get(name, '')
+        unit_pd= round(net_op / days) if days > 0 and net_op > 0 else 0
+
+        # 案件別内訳：社員番号ベースでフィルタ
+        g_proj = df_get[df_get['社員番号'].astype(str) == emp_id].groupby('登録案件名').agg(
+            apo=('アポイントID','count'), sales=('sales','sum')).reset_index()
+        c_proj = df_cxl_dash[df_cxl_dash['社員番号'].astype(str) == emp_id].groupby('登録案件名').agg(
+            cxl=('アポイントID','count'), sc=('sales','sum')).reset_index()
+        proj_m  = g_proj.merge(c_proj, on='登録案件名', how='left').fillna(0)
+        proj_m['valid'] = (proj_m['apo'] - proj_m['cxl']).astype(int)
+        proj_m['net']   = (proj_m['sales'] - proj_m['sc']).astype(int)
+        proj_m = proj_m[proj_m['valid'] > 0].sort_values('valid', ascending=False).head(20)
+        projects = [
+            {'name': str(r['登録案件名']),
+             'apo':   int(r['apo']),
+             'cxl':   int(r['cxl']),
+             'valid': int(r['valid']),
+             'sales': int(r['net'])}
+            for _, r in proj_m.iterrows()
+        ]
+
+        operators.append({
+            'name': name, 'site': site_d, 'rank': rank_d,
+            'sales': net_op, 'sales_dash': net_dash,
+            'apo': apo, 'cancel': cxl_op, 'valid': apo - cxl_op,
+            'calls': calls, 'apoRate': ar,
+            'workH': round(float(hours), 1) if hours else None,
+            'labor': labor,
+            'labor_base': l_base, 'incentive_daily': inc_day,
+            'days': days, 'unitPerDay': unit_pd, 'costRate': cost_r,
+            'projects': projects,
+        })
+
+    operators.sort(key=lambda x: (-x['sales'] if x['sales'] > 0
+                                  else (0 if x['sales'] == 0 else 1)))
+    return operators
+
+
+# ============================================================
+# 起動
+# ============================================================
+from app_staff import register_staff_routes
+register_staff_routes(app)
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
