@@ -348,15 +348,18 @@ def update():
             }[k]
             labor = jinjer + (inc_all if k == 'all' else inc_site.get(site_jp, 0))
 
-            # OP個人実績の積み上げ（全体 = 各サイトの合計が成立）
+            # OP個人実績の積み上げ
+            # 全体（all）は六本木SC・リモートSCのみ集計（AI・サイト未所属は除外）
+            valid_sites = {shinjuku_label, 'リモートSC'}
             site_ops = [op for op in _ops_for_unit
-                        if k == 'all' or op['site'] == site_jp]
+                        if k != 'all' and op['site'] == site_jp
+                        or k == 'all' and op['site'] in valid_sites]
             sales  = sum(op['sales']  for op in site_ops)
             apo    = sum(op['apo']    for op in site_ops)
             cancel = sum(op['cancel'] for op in site_ops)
             valid  = apo - cancel
             # callsはsite_ops定義後に計算（前ループの値を使わないよう順序を保証）
-            calls  = sum(op.get('calls', 0) or 0 for op in site_ops) if k != 'all' else sum(r['calls'] for r in daily['all'])
+            calls  = sum(op.get('calls', 0) or 0 for op in site_ops) if k != 'all' else sum(op.get('calls', 0) or 0 for op in site_ops)
             cr     = round(cancel / apo * 100, 1) if apo > 0 else 0
             ar     = round(apo / calls * 100, 2)  if calls > 0 else 0
             cost   = round(labor / sales * 100, 1) if sales > 0 else 0
