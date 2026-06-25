@@ -1353,7 +1353,7 @@ def register_staff_routes(app):
                 days = calc_days
                 rate_row = RATE_TABLE.get(pattern, {}).get(days)
                 if rate_row:
-                    base = wage * 8 + 1000 + mgmt
+                    base = wage * 8 + 3150 + 1000 + mgmt
                     r["target_achieve"] = int(base * days * rate_row[0])
                     r["target_maintain"] = int(base * days * rate_row[1])
 
