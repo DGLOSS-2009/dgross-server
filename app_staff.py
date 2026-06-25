@@ -1152,7 +1152,7 @@ def register_staff_routes(app):
         master = load_staff_master()
 
         apo_res = supabase_staff.table("appointments")\
-            .select("*").eq("target_month", target_month).limit(10000).execute()
+            .select("*").eq("target_month", target_month).range(0, 9999).execute()
         apo_rows = apo_res.data
 
         att_res = supabase_staff.table("attendance")\
@@ -1214,7 +1214,7 @@ def register_staff_routes(app):
 
         # 2ヶ月前の売上実績（アポ取得金額－キャンセル金額＋FB）を計算
         prior_apo_res = supabase_staff.table("appointments")\
-            .select("*").eq("target_month", prior_month).limit(10000).execute()
+            .select("*").eq("target_month", prior_month).range(0, 9999).execute()
         prior_apo_rows = prior_apo_res.data
 
         prior_sales_map = {}
